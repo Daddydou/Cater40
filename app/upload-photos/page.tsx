@@ -112,7 +112,7 @@ export default function UploadPhotosPage() {
                 <button type="button" onClick={e => { e.stopPropagation(); setPhotoBras(null); if (refBras.current) refBras.current.value = ''; }} className="text-gray-500 hover:text-white text-xs">✕</button>
               )}
             </div>
-            <input ref={refBras} type="file" accept="image/*" className="hidden"
+            <input ref={refBras} type="file" accept="image/*" capture="environment" className="hidden"
               onChange={(e: ChangeEvent<HTMLInputElement>) => setPhotoBras(e.target.files?.[0] ?? null)} />
           </div>
 
@@ -133,7 +133,7 @@ export default function UploadPhotosPage() {
                 <button type="button" onClick={e => { e.stopPropagation(); setPhotoGens(null); if (refGens.current) refGens.current.value = ''; }} className="text-gray-500 hover:text-white text-xs">✕</button>
               )}
             </div>
-            <input ref={refGens} type="file" accept="image/*" className="hidden"
+            <input ref={refGens} type="file" accept="image/*" capture="environment" className="hidden"
               onChange={(e: ChangeEvent<HTMLInputElement>) => setPhotoGens(e.target.files?.[0] ?? null)} />
           </div>
 
