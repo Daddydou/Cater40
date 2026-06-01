@@ -172,7 +172,7 @@ export default function UploadPhotosPage() {
           {/* Photo gens */}
           <div>
             <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">
-              Ta photo de toi
+              Photo de toi avec Sophie
               <span className="text-gray-600 normal-case ml-1">(optionnel)</span>
             </label>
             <div
