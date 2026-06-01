@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ── Confetti animation ───────────────────────────────── */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-40px) rotate(0deg) scaleX(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(50vh) rotate(360deg) scaleX(-1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(110vh) rotate(720deg) scaleX(1);
+    opacity: 0;
+  }
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -20px;
+  animation: confetti-fall linear infinite;
+  pointer-events: none;
+}
+
+/* ── Pulse glow for room code ─────────────────────────── */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.4); }
+  50%       { box-shadow: 0 0 40px rgba(168, 85, 247, 0.8); }
+}
+
+.glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* ── Player card slide-in ─────────────────────────────── */
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.player-card {
+  animation: slide-in 0.3s ease-out both;
+}
+
+/* ── Ortho classement: pop-in ─────────────────────────── */
+@keyframes pop-in {
+  0%   { opacity: 0; transform: scale(0.5) translateY(20px); }
+  70%  { transform: scale(1.06) translateY(-4px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.pop-in {
+  animation: pop-in 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+/* ── Ortho confetti: lettres et ananas ────────────────── */
+@keyframes letter-fall {
+  0%   { transform: translateY(-40px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+.letter-confetti {
+  position: absolute;
+  top: -40px;
+  animation: letter-fall linear infinite;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Famille en Or: flip de carte ─────────────────────── */
+.fo-card-wrap {
+  perspective: 1000px;
+}
+
+.fo-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.fo-card-inner.revealed {
+  transform: rotateY(180deg);
+}
+
+.fo-card-front,
+.fo-card-back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.fo-card-back {
+  transform: rotateY(180deg);
+}
+
+/* ── VOL blink ────────────────────────────────────────── */
+@keyframes vol-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.25; }
+}
+
+.vol-blink {
+  animation: vol-blink 0.65s ease-in-out infinite;
+}
+
+/* ── Countdown ────────────────────────────────────────── */
+@keyframes countdown-num {
+  0%   { opacity: 0; transform: scale(3.5); }
+  15%  { opacity: 1; transform: scale(1.05); }
+  70%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.2); }
+}
+
+@keyframes countdown-go {
+  0%   { opacity: 0; transform: scale(0.4) translateY(16px); }
+  60%  { transform: scale(1.06) translateY(-4px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.countdown-num {
+  animation: countdown-num 0.88s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.countdown-go {
+  animation: countdown-go 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}

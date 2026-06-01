@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\lolor\\\\Cater40\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(npx tsc *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\lolor\\\\Cater40\" -Recurse -Force)",
+      "Bash(Select-Object FullName)",
+      "Bash(npm install *)",
+      "Bash(npx next *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\lolor\\\\Cater40\" -Recurse -File)",
+      "Bash(Sort-Object FullName)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\lolor\\\\Cater40\" -Depth 1 | Where-Object { $_.PSIsContainer -eq $false } | Select-Object Name)",
+      "Bash(New-Item *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\lolor\\\\Cater40\" -Recurse -File -Filter \"*.tsx\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "PowerShell(Select-String *)",
+      "PowerShell(Get-Content *)",
+      "Bash(Get-Content *)",
+      "PowerShell(Head *)",
+      "Bash(npx --prefix /c/Users/lolor/budget-duo tsc -p /c/Users/lolor/budget-duo/tsconfig.json --noEmit)",
+      "Bash(git -C \"/c/Users/lolor/Cater40\" add \"public/images/jeu-photos-gens/resultats/nul.svg\")",
+      "Bash(echo \"exit: $?\")",
+      "Bash(git *)"
+    ]
+  }
+}
