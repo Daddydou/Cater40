@@ -1,10 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect, FormEvent, ChangeEvent } from 'react';
+import { useState, useRef, FormEvent, ChangeEvent } from 'react';
 import { supabase } from '@/lib/supabase';
-
-const PASSWORD_KEY = 'upload_auth';
-const CORRECT_PASSWORD = 'cater40';
 
 function normalizePrenom(raw: string): string {
   const trimmed = raw.trim();
@@ -16,9 +13,7 @@ function getExtension(filename: string): string {
   return filename.split('.').pop()?.toLowerCase() ?? 'jpg';
 }
 
-// ── Formulaire d'upload (affiché seulement une fois authentifié) ─────────────
-
-function UploadForm() {
+export default function UploadPhotosPage() {
   const [prenom, setPrenom] = useState('');
   const [photoBras, setPhotoBras] = useState<File | null>(null);
   const [photoGens, setPhotoGens] = useState<File | null>(null);
@@ -171,59 +166,6 @@ function UploadForm() {
         )}
 
       </div>
-    </div>
-  );
-}
-
-// ── Page principale avec garde mot de passe ───────────────────────────────────
-
-export default function UploadPhotosPage() {
-  const [unlocked, setUnlocked] = useState(false);
-  const [showField, setShowField] = useState(false);
-  const [pwInput, setPwInput] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (localStorage.getItem(PASSWORD_KEY) === CORRECT_PASSWORD) {
-      setUnlocked(true);
-    }
-  }, []);
-
-  const handleDoubleClick = () => {
-    setShowField(true);
-    setTimeout(() => inputRef.current?.focus(), 30);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== 'Enter') return;
-    if (pwInput === CORRECT_PASSWORD) {
-      localStorage.setItem(PASSWORD_KEY, CORRECT_PASSWORD);
-      setUnlocked(true);
-    } else {
-      setPwInput('');
-      setShowField(false);
-    }
-  };
-
-  if (unlocked) return <UploadForm />;
-
-  return (
-    <div
-      className="min-h-screen flex items-center justify-center bg-white cursor-default select-none"
-      onDoubleClick={handleDoubleClick}
-    >
-      <p className="text-gray-300 text-lg">Sois patient</p>
-      {showField && (
-        <input
-          ref={inputRef}
-          type="password"
-          value={pwInput}
-          onChange={e => setPwInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          autoComplete="off"
-          style={{ position: 'fixed', opacity: 0, width: 0, height: 0, top: 0, left: 0, pointerEvents: 'none' }}
-        />
-      )}
     </div>
   );
 }
