@@ -1,10 +1,60 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { CaterSession, CaterPlayer, CaterQuestion, TeamSide, DEFAULT_QUESTIONS } from '../_lib/types';
+import { Room } from '@/types';
+import { Confetti } from '@/components/Confetti';
+import { useWakeLock } from '@/lib/hooks/useWakeLock';
 
-export default function AnimateurView() {
+type SessionStatus = 'lobby' | 'playing' | 'finished';
+type TeamSide = 'A' | 'B';
+
+interface CaterSession {
+  id: string;
+  room_id: string;
+  status: SessionStatus;
+  current_question_index: number;
+  team_a_name: string | null;
+  team_b_name: string | null;
+  team_a_score: number;
+  team_b_score: number;
+  active_team: TeamSide | null;
+  created_at: string;
+}
+
+interface CaterPlayer {
+  id: string;
+  session_id: string;
+  name: string;
+  team: TeamSide | null;
+}
+
+interface CaterQuestion {
+  id: string;
+  session_id: string;
+  question_text: string;
+  order_index: number;
+}
+
+const DEFAULT_QUESTIONS = [
+  'Prénoms féminins commençant par la lettre M',
+  'Marques de voiture françaises',
+  'Capitales européennes',
+  'Plats italiens',
+  "Sports olympiques d'été",
+  "Pays d'Afrique subsaharienne",
+  'Instruments de musique à cordes',
+  'Films avec Leonardo DiCaprio',
+  'Légumes verts',
+  'Chanteurs français des années 80',
+];
+
+export default function CaterEnOrAnimateurPage() {
+  useWakeLock();
+  const { code } = useParams<{ code: string }>();
+
+  const [room, setRoom] = useState<Room | null>(null);
   const [session, setSession] = useState<CaterSession | null>(null);
   const [players, setPlayers] = useState<CaterPlayer[]>([]);
   const [questions, setQuestions] = useState<CaterQuestion[]>([]);
@@ -26,32 +76,46 @@ export default function AnimateurView() {
     if (data) setQuestions(data as CaterQuestion[]);
   }, []);
 
-  const fetchActiveSession = useCallback(async () => {
-    const { data } = await supabase
+  useEffect(() => {
+    supabase
+      .from('rooms')
+      .select('*')
+      .eq('code', code)
+      .single()
+      .then(({ data }) => {
+        if (data) setRoom(data as Room);
+        else setLoading(false);
+      });
+  }, [code]);
+
+  useEffect(() => {
+    if (!room) return;
+    supabase
       .from('cater_sessions')
       .select('*')
+      .eq('room_id', room.id)
       .neq('status', 'finished')
       .order('created_at', { ascending: false })
       .limit(1)
-      .maybeSingle();
-
-    if (data) {
-      setSession(data as CaterSession);
-      await Promise.all([fetchPlayers(data.id), fetchQuestions(data.id)]);
-    }
-    setLoading(false);
-  }, [fetchPlayers, fetchQuestions]);
-
-  useEffect(() => {
-    fetchActiveSession();
-  }, [fetchActiveSession]);
+      .maybeSingle()
+      .then(async ({ data }) => {
+        if (data) {
+          const s = data as CaterSession;
+          setSession(s);
+          if (s.team_a_name) setTeamAInput(s.team_a_name);
+          if (s.team_b_name) setTeamBInput(s.team_b_name);
+          await Promise.all([fetchPlayers(s.id), fetchQuestions(s.id)]);
+        }
+        setLoading(false);
+      });
+  }, [room, fetchPlayers, fetchQuestions]);
 
   useEffect(() => {
     if (!session) return;
     const sid = session.id;
 
     const channel = supabase
-      .channel(`animateur-${sid}`)
+      .channel(`cater-anim-${sid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cater_sessions', filter: `id=eq.${sid}` }, (payload) => {
         setSession(payload.new as CaterSession);
       })
@@ -67,9 +131,10 @@ export default function AnimateurView() {
   }, [session?.id, fetchPlayers, fetchQuestions]);
 
   const createSession = async () => {
+    if (!room) return;
     const { data } = await supabase
       .from('cater_sessions')
-      .insert({ status: 'lobby' })
+      .insert({ status: 'lobby', room_id: room.id })
       .select()
       .single();
     if (data) {
@@ -80,11 +145,11 @@ export default function AnimateurView() {
   };
 
   const resetSession = async () => {
-    if (!session) return;
+    if (!session || !room) return;
     await supabase.from('cater_sessions').update({ status: 'finished' }).eq('id', session.id);
     const { data } = await supabase
       .from('cater_sessions')
-      .insert({ status: 'lobby' })
+      .insert({ status: 'lobby', room_id: room.id })
       .select()
       .single();
     if (data) {
@@ -130,6 +195,13 @@ export default function AnimateurView() {
         status: isLast ? 'finished' : 'playing',
       })
       .eq('id', session.id);
+
+    if (isLast && room) {
+      await supabase
+        .from('rooms')
+        .update({ status: 'finished', current_game: 'cater-en-or:finished' })
+        .eq('id', room.id);
+    }
   };
 
   if (loading) {
@@ -141,30 +213,34 @@ export default function AnimateurView() {
   }
 
   if (!session || session.status === 'finished') {
+    const nameA = session?.team_a_name || 'Équipe A';
+    const nameB = session?.team_b_name || 'Équipe B';
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950">
-        <div className="text-center space-y-6">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 relative">
+        {session?.status === 'finished' && <Confetti />}
+        <div className="text-center space-y-6 relative z-10">
           <div>
             <div className="text-6xl mb-4">🎯</div>
             <h1 className="text-4xl font-bold text-yellow-400">Une Cater en or</h1>
+            <p className="text-gray-400 text-sm mt-1">Interface animateur</p>
           </div>
           {session?.status === 'finished' && (
             <div className="bg-gray-800 rounded-2xl p-6">
               <p className="text-gray-400 text-sm mb-4">Partie terminée</p>
               <div className="flex gap-6 justify-center">
                 <div className="text-center">
-                  <p className="text-gray-400 text-sm">{session.team_a_name}</p>
+                  <p className="text-gray-400 text-sm">{nameA}</p>
                   <p className="text-5xl font-bold text-white">{session.team_a_score}</p>
                 </div>
                 <div className="text-4xl font-bold text-gray-600 self-center">—</div>
                 <div className="text-center">
-                  <p className="text-gray-400 text-sm">{session.team_b_name}</p>
+                  <p className="text-gray-400 text-sm">{nameB}</p>
                   <p className="text-5xl font-bold text-white">{session.team_b_score}</p>
                 </div>
               </div>
               {session.team_a_score !== session.team_b_score && (
                 <p className="text-yellow-400 font-bold text-lg mt-4">
-                  🏆 {session.team_a_score > session.team_b_score ? session.team_a_name : session.team_b_name} gagne !
+                  🏆 {session.team_a_score > session.team_b_score ? nameA : nameB} gagne !
                 </p>
               )}
               {session.team_a_score === session.team_b_score && (

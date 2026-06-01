@@ -24,7 +24,10 @@
       "Bash(git -C \"/c/Users/lolor/Cater40\" add \"public/images/jeu-photos-gens/resultats/nul.svg\")",
       "Bash(echo \"exit: $?\")",
       "Bash(git *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(Get-ChildItem -Path C:\\\\Users\\\\lolor\\\\cater40 -Recurse -Directory)",
+      "Bash(dir \"C:\\\\Users\\\\lolor\\\\cater40\\\\app\\\\room\\\\[code]\")",
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\lolor\\\\cater40\\\\app\\\\games\\\\cater-en-or\")"
     ]
   }
 }

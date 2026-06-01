@@ -1,13 +1,53 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { CaterSession, CaterPlayer, CaterQuestion } from '../_lib/types';
+import { Room } from '@/types';
+import { Confetti } from '@/components/Confetti';
+import { useWakeLock } from '@/lib/hooks/useWakeLock';
+import { useHeartbeat } from '@/lib/hooks/useHeartbeat';
+import { ConnectionBanner } from '@/components/ConnectionBanner';
+
+type SessionStatus = 'lobby' | 'playing' | 'finished';
+type TeamSide = 'A' | 'B';
+
+interface CaterSession {
+  id: string;
+  room_id: string;
+  status: SessionStatus;
+  current_question_index: number;
+  team_a_name: string | null;
+  team_b_name: string | null;
+  team_a_score: number;
+  team_b_score: number;
+  active_team: TeamSide | null;
+  created_at: string;
+}
+
+interface CaterPlayer {
+  id: string;
+  session_id: string;
+  name: string;
+  team: TeamSide | null;
+}
+
+interface CaterQuestion {
+  id: string;
+  session_id: string;
+  question_text: string;
+  order_index: number;
+}
 
 const STORAGE_PLAYER = 'cater_player_id';
 const STORAGE_SESSION = 'cater_session_id';
 
-export default function JoueurView() {
+export default function CaterEnOrPage() {
+  useWakeLock();
+  useHeartbeat();
+  const { code } = useParams<{ code: string }>();
+
+  const [room, setRoom] = useState<Room | null>(null);
   const [session, setSession] = useState<CaterSession | null>(null);
   const [player, setPlayer] = useState<CaterPlayer | null>(null);
   const [questions, setQuestions] = useState<CaterQuestion[]>([]);
@@ -29,23 +69,41 @@ export default function JoueurView() {
     return data as CaterPlayer | null;
   }, []);
 
-  useEffect(() => {
-    const init = async () => {
-      const { data: sessionData } = await supabase
-        .from('cater_sessions')
-        .select('*')
-        .neq('status', 'finished')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+  const loadSession = useCallback(async (roomId: string) => {
+    const { data } = await supabase
+      .from('cater_sessions')
+      .select('*')
+      .eq('room_id', roomId)
+      .neq('status', 'finished')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) setSession(data as CaterSession);
+    return data as CaterSession | null;
+  }, []);
 
-      if (!sessionData) {
+  useEffect(() => {
+    supabase
+      .from('rooms')
+      .select('*')
+      .eq('code', code)
+      .single()
+      .then(({ data }) => {
+        if (data) setRoom(data as Room);
+        else setLoading(false);
+      });
+  }, [code]);
+
+  useEffect(() => {
+    if (!room) return;
+
+    const init = async () => {
+      const sess = await loadSession(room.id);
+
+      if (!sess) {
         setLoading(false);
         return;
       }
-
-      const sess = sessionData as CaterSession;
-      setSession(sess);
 
       const savedPlayerId = localStorage.getItem(STORAGE_PLAYER);
       const savedSessionId = localStorage.getItem(STORAGE_SESSION);
@@ -63,14 +121,14 @@ export default function JoueurView() {
     };
 
     init();
-  }, [fetchPlayer, fetchQuestions]);
+  }, [room, fetchPlayer, fetchQuestions, loadSession]);
 
   useEffect(() => {
     if (!session) return;
     const sid = session.id;
 
     const channel = supabase
-      .channel(`joueur-${sid}-${Math.random()}`)
+      .channel(`cater-joueur-${sid}-${Math.random()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cater_sessions', filter: `id=eq.${sid}` }, async (payload) => {
         const updated = payload.new as CaterSession;
         setSession(updated);
@@ -78,11 +136,9 @@ export default function JoueurView() {
           await fetchQuestions(sid);
         }
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cater_players', filter: `session_id=eq.${sid}` }, async (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cater_players', filter: `session_id=eq.${sid}` }, (payload) => {
         const updated = payload.new as CaterPlayer;
-        if (player && updated.id === player.id) {
-          setPlayer(updated);
-        }
+        setPlayer(prev => prev && updated.id === prev.id ? updated : prev);
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cater_questions', filter: `session_id=eq.${sid}` }, () => {
         fetchQuestions(sid);
@@ -90,7 +146,7 @@ export default function JoueurView() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [session?.id, player?.id, questions.length, fetchQuestions]);
+  }, [session?.id, questions.length, fetchQuestions]);
 
   const joinGame = async () => {
     if (!session || !nameInput.trim()) return;
@@ -123,7 +179,9 @@ export default function JoueurView() {
         <div className="text-center">
           <div className="text-5xl mb-4">🎯</div>
           <h1 className="text-2xl font-bold text-yellow-400 mb-3">Une Cater en or</h1>
-          <p className="text-gray-400">Aucune session en cours.<br />Demande à l&apos;animateur de créer une session.</p>
+          <p className="text-gray-400">
+            Aucune session en cours.<br />Demande à l&apos;animateur de créer une session.
+          </p>
         </div>
       </div>
     );
@@ -136,8 +194,9 @@ export default function JoueurView() {
     const winnerB = session.team_b_score > session.team_a_score;
 
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950 px-6">
-        <div className="text-center w-full max-w-sm">
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 px-6 relative">
+        <Confetti />
+        <div className="text-center w-full max-w-sm relative z-10">
           <div className="text-5xl mb-4">🏆</div>
           <h1 className="text-2xl font-bold text-yellow-400 mb-6">Fin de la partie !</h1>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -197,6 +256,7 @@ export default function JoueurView() {
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950 px-6">
+        <ConnectionBanner onReconnect={() => { if (room) loadSession(room.id); }} />
         <div className="text-center w-full max-w-sm">
           <div className="text-5xl mb-4">⏳</div>
           <h1 className="text-2xl font-bold text-white mb-2">Salut {player.name} !</h1>
@@ -229,6 +289,7 @@ export default function JoueurView() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col px-4 py-6">
+      <ConnectionBanner onReconnect={() => { if (room) loadSession(room.id); }} />
       <div className="flex-1 flex flex-col max-w-sm mx-auto w-full">
         <p className="text-gray-500 text-xs text-center mb-4 uppercase tracking-wide">
           Question {session.current_question_index + 1} / {questions.length || '…'}

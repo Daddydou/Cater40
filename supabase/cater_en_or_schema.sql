@@ -6,6 +6,7 @@ DROP TABLE IF EXISTS public.cater_sessions;
 
 CREATE TABLE public.cater_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  room_id uuid REFERENCES public.rooms(id) ON DELETE CASCADE,
   status text NOT NULL DEFAULT 'lobby' CHECK (status IN ('lobby', 'playing', 'finished')),
   current_question_index integer NOT NULL DEFAULT 0,
   team_a_name text,

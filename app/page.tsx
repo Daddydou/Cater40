@@ -156,7 +156,6 @@ function HomeContent() {
               { href: '/join/concours-ortho', label: '📝 Lien Concours Ortho' },
               { href: '/join/dictee', label: '📖 Lien Dictée' },
               { href: '/join/famille-or', label: '🥇 Lien Famille en Or' },
-              { href: '/games/cater-en-or/animateur', label: '🎯 Une Cater en or' },
               { href: '/games/photos-gens', label: '📸 Photos Gens' },
               { href: '/games/jeu-bras', label: '🦾 Gros Bras' },
               { href: '/upload-photos', label: '📤 Upload Photos' },

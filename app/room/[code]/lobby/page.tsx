@@ -107,6 +107,8 @@ export default function LobbyPage() {
               setPendingRedirect(`/room/${code}/dictee`);
             } else if (updated.current_game === 'famille-or') {
               setPendingRedirect(`/room/${code}/famille-or`);
+            } else if (updated.current_game === 'cater-en-or') {
+              setPendingRedirect(`/room/${code}/cater-en-or`);
             }
           }
         }
@@ -118,7 +120,7 @@ export default function LobbyPage() {
     };
   }, [room, fetchData, code, router]);
 
-  const handleSelectGame = async (game: 'jeu-bras' | 'concours-ortho' | 'dictee' | 'famille-or') => {
+  const handleSelectGame = async (game: 'jeu-bras' | 'concours-ortho' | 'dictee' | 'famille-or' | 'cater-en-or') => {
     if (!room) return;
     setStarting(true);
     const { error: updateError } = await supabase
@@ -136,6 +138,8 @@ export default function LobbyPage() {
       setPendingRedirect(`/room/${code}/dictee/animateur`);
     } else if (game === 'famille-or') {
       setPendingRedirect(`/room/${code}/famille-or/animateur`);
+    } else if (game === 'cater-en-or') {
+      setPendingRedirect(`/room/${code}/cater-en-or/animateur`);
     } else {
       setPendingRedirect(`/room/${code}/concours-ortho/animateur`);
     }
@@ -334,6 +338,17 @@ export default function LobbyPage() {
               <span className="text-2xl">🥇</span>
               <span className="ml-3 text-white font-bold text-base">
                 Famille en Or
+              </span>
+            </button>
+
+            <button
+              onClick={() => handleSelectGame('cater-en-or')}
+              disabled={starting}
+              className="w-full text-left px-5 py-4 rounded-2xl bg-gradient-to-r from-orange-500/30 to-yellow-500/30 border border-orange-400/30 hover:from-orange-500/50 hover:to-yellow-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <span className="text-2xl">🎯</span>
+              <span className="ml-3 text-white font-bold text-base">
+                Une Cater en or
               </span>
             </button>
 
