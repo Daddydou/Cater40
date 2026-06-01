@@ -13,12 +13,6 @@ function getExtension(filename: string): string {
   return filename.split('.').pop()?.toLowerCase() ?? 'jpg';
 }
 
-interface DebugLog {
-  label: string;
-  ok: boolean;
-  detail: string;
-}
-
 export default function UploadPhotosPage() {
   const [prenom, setPrenom] = useState('');
   const [photoBras, setPhotoBras] = useState<File | null>(null);
@@ -26,7 +20,6 @@ export default function UploadPhotosPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
-  const [debugLogs, setDebugLogs] = useState<DebugLog[]>([]);
 
   const refBras = useRef<HTMLInputElement>(null);
   const refGens = useRef<HTMLInputElement>(null);
@@ -48,56 +41,28 @@ export default function UploadPhotosPage() {
     setLoading(true);
     setSuccess('');
     setError('');
-    setDebugLogs([]);
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '(non défini)';
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '(non défini)';
-    console.log('[upload-photos] Supabase URL  :', supabaseUrl);
-    console.log('[upload-photos] Supabase KEY  :', supabaseKey.slice(0, 40) + '…');
 
     const nom = normalizePrenom(prenom);
-    const logs: DebugLog[] = [];
     const errors: string[] = [];
 
     if (photoBras) {
       const ext = getExtension(photoBras.name);
       const path = `Bras-${nom}.${ext}`;
-      console.log('[upload-photos] Tentative bras →', { bucket: 'jeu-bras', path, size: photoBras.size, type: photoBras.type });
-      const result = await supabase.storage
+      const { error: err } = await supabase.storage
         .from('jeu-bras')
         .upload(path, photoBras, { upsert: true, contentType: photoBras.type });
-      console.log('[upload-photos] Réponse bras ←', result);
-      const ok = !result.error;
-      logs.push({
-        label: `🦾 jeu-bras / ${path}`,
-        ok,
-        detail: ok
-          ? `data: ${JSON.stringify(result.data)}`
-          : `error: ${result.error?.message} (status: ${result.error?.status ?? '?'}) — ${JSON.stringify(result.error)}`,
-      });
-      if (result.error) errors.push(`Photo bras : ${result.error.message}`);
+      if (err) errors.push(`Photo bras : ${err.message}`);
     }
 
     if (photoGens) {
       const ext = getExtension(photoGens.name);
       const path = `Gens-${nom}.${ext}`;
-      console.log('[upload-photos] Tentative gens →', { bucket: 'jeu-photos-gens', path, size: photoGens.size, type: photoGens.type });
-      const result = await supabase.storage
+      const { error: err } = await supabase.storage
         .from('jeu-photos-gens')
         .upload(path, photoGens, { upsert: true, contentType: photoGens.type });
-      console.log('[upload-photos] Réponse gens ←', result);
-      const ok = !result.error;
-      logs.push({
-        label: `📸 jeu-photos-gens / ${path}`,
-        ok,
-        detail: ok
-          ? `data: ${JSON.stringify(result.data)}`
-          : `error: ${result.error?.message} (status: ${result.error?.status ?? '?'}) — ${JSON.stringify(result.error)}`,
-      });
-      if (result.error) errors.push(`Photo gens : ${result.error.message}`);
+      if (err) errors.push(`Photo gens : ${err.message}`);
     }
 
-    setDebugLogs(logs);
     setLoading(false);
 
     if (errors.length === 0) {
@@ -116,9 +81,6 @@ export default function UploadPhotosPage() {
           <div className="text-5xl mb-3">📤</div>
           <h1 className="text-2xl font-extrabold text-yellow-400">Upload de photos</h1>
           <p className="text-gray-400 text-sm mt-1">Gros Bras &amp; Photos Gens</p>
-          <p className="text-gray-600 text-xs mt-2 font-mono">
-            {(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '(non défini)').slice(0, 20)}…
-          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -228,21 +190,6 @@ export default function UploadPhotosPage() {
           <div className="bg-red-900/50 border border-red-700 rounded-2xl px-5 py-4">
             <p className="text-red-300 font-bold text-sm whitespace-pre-line">❌ {error}</p>
             <p className="text-red-400/70 text-xs mt-1">Réessaie ou contacte l&apos;animateur.</p>
-          </div>
-        )}
-
-        {/* Debug logs */}
-        {debugLogs.length > 0 && (
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-4 space-y-3">
-            <p className="text-gray-500 text-xs uppercase tracking-wide font-bold">Debug Supabase</p>
-            {debugLogs.map((log, i) => (
-              <div key={i} className={`rounded-xl p-3 ${log.ok ? 'bg-green-950 border border-green-800' : 'bg-red-950 border border-red-800'}`}>
-                <p className={`text-sm font-bold ${log.ok ? 'text-green-300' : 'text-red-300'}`}>
-                  {log.ok ? '✅' : '❌'} {log.label}
-                </p>
-                <p className="text-xs text-gray-400 mt-1 break-all font-mono">{log.detail}</p>
-              </div>
-            ))}
           </div>
         )}
 
