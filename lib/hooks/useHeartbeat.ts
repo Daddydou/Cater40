@@ -22,12 +22,10 @@ export function useHeartbeat() {
 
     return () => {
       clearInterval(interval);
-      supabase
+      void supabase
         .from('players')
         .update({ is_online: false })
-        .eq('id', playerId)
-        .then(() => {})
-        .catch(() => {});
+        .eq('id', playerId);
     };
   }, []);
 }

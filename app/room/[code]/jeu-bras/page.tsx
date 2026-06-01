@@ -220,7 +220,7 @@ export default function JeuBrasPage() {
         {/* Non-animateur : message d'attente si phase de transition */}
         {!isAnimateur && phase === 'ecrire' && (
           <p className="text-center text-pink-300/70 text-sm">
-            Écris sur ton bras, puis attends le signal de l'animateur 🎂
+            Écris sur ton bras, puis attends le signal de l&apos;animateur 🎂
           </p>
         )}
       </div>

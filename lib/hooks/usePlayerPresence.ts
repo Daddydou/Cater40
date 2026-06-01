@@ -18,13 +18,12 @@ export function usePlayerPresence(roomId: string | null): Player[] {
   const markStale = useCallback(async () => {
     if (!roomId) return;
     const cutoff = new Date(Date.now() - 10_000).toISOString();
-    await supabase
+    void supabase
       .from('players')
       .update({ is_online: false })
       .eq('room_id', roomId)
       .eq('is_online', true)
-      .lt('last_seen', cutoff)
-      .catch(() => {});
+      .lt('last_seen', cutoff);
   }, [roomId]);
 
   useEffect(() => {

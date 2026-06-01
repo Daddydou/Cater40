@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { RESULT_LEVELS, getResultLevel } from '@/lib/jeu-bras-data';
+import { getResultLevel } from '@/lib/jeu-bras-data';
 import { listBucketPhotos, StoragePhoto } from '@/lib/storage-utils';
 
 export default function JeuBrasPage() {
