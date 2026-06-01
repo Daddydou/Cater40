@@ -288,7 +288,7 @@ export default function CitationsPerduesPage() {
               return (
                 <div
                   key={idx}
-                  className="bg-gray-900/60 border border-gray-800 rounded-2xl px-4 py-4 space-y-3"
+                  className={`rounded-2xl px-4 py-4 space-y-3 border transition-colors ${assoc ? 'bg-green-950/60 border-green-700' : 'bg-gray-900/60 border-gray-800'}`}
                 >
                   <div className="text-base leading-loose tracking-widest" style={{ fontFamily: 'monospace' }}>
                     {renderPhrase(phrase, session.lettres_achetees)}
