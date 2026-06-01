@@ -126,13 +126,13 @@ export default function UploadPhotosPage() {
           {/* Prénom */}
           <div>
             <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">
-              Ton prénom <span className="text-yellow-400">*</span>
+              Qui es-tu ? <span className="text-yellow-400">*</span>
             </label>
             <input
               type="text"
               value={prenom}
               onChange={e => setPrenom(e.target.value)}
-              placeholder="Ex : Marie"
+              placeholder="Ex : Daddy"
               required
               className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-lg focus:outline-none focus:border-yellow-400 transition-colors"
             />
