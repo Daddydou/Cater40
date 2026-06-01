@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useRef, FormEvent, ChangeEvent } from 'react';
+import { useState, useRef, useEffect, FormEvent, ChangeEvent } from 'react';
 import { supabase } from '@/lib/supabase';
+
+const PASSWORD_KEY = 'upload_auth';
+const CORRECT_PASSWORD = 'cater40';
 
 function normalizePrenom(raw: string): string {
   const trimmed = raw.trim();
@@ -13,14 +16,15 @@ function getExtension(filename: string): string {
   return filename.split('.').pop()?.toLowerCase() ?? 'jpg';
 }
 
-export default function UploadPhotosPage() {
+// ── Formulaire d'upload (affiché seulement une fois authentifié) ─────────────
+
+function UploadForm() {
   const [prenom, setPrenom] = useState('');
   const [photoBras, setPhotoBras] = useState<File | null>(null);
   const [photoGens, setPhotoGens] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
-
   const refBras = useRef<HTMLInputElement>(null);
   const refGens = useRef<HTMLInputElement>(null);
 
@@ -37,7 +41,6 @@ export default function UploadPhotosPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!canSubmit || loading) return;
-
     setLoading(true);
     setSuccess('');
     setError('');
@@ -47,19 +50,17 @@ export default function UploadPhotosPage() {
 
     if (photoBras) {
       const ext = getExtension(photoBras.name);
-      const path = `Bras-${nom}.${ext}`;
       const { error: err } = await supabase.storage
         .from('jeu-bras')
-        .upload(path, photoBras, { upsert: true, contentType: photoBras.type });
+        .upload(`Bras-${nom}.${ext}`, photoBras, { upsert: true, contentType: photoBras.type });
       if (err) errors.push(`Photo bras : ${err.message}`);
     }
 
     if (photoGens) {
       const ext = getExtension(photoGens.name);
-      const path = `Gens-${nom}.${ext}`;
       const { error: err } = await supabase.storage
         .from('jeu-photos-gens')
-        .upload(path, photoGens, { upsert: true, contentType: photoGens.type });
+        .upload(`Gens-${nom}.${ext}`, photoGens, { upsert: true, contentType: photoGens.type });
       if (err) errors.push(`Photo gens : ${err.message}`);
     }
 
@@ -85,7 +86,6 @@ export default function UploadPhotosPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
 
-          {/* Prénom */}
           <div>
             <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">
               Qui es-tu ? <span className="text-yellow-400">*</span>
@@ -100,7 +100,6 @@ export default function UploadPhotosPage() {
             />
           </div>
 
-          {/* Photo bras */}
           <div>
             <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">
               Ta photo de bras
@@ -115,23 +114,13 @@ export default function UploadPhotosPage() {
                 {photoBras ? photoBras.name : 'Choisir une photo…'}
               </span>
               {photoBras && (
-                <button
-                  type="button"
-                  onClick={e => { e.stopPropagation(); setPhotoBras(null); if (refBras.current) refBras.current.value = ''; }}
-                  className="text-gray-500 hover:text-white text-xs"
-                >✕</button>
+                <button type="button" onClick={e => { e.stopPropagation(); setPhotoBras(null); if (refBras.current) refBras.current.value = ''; }} className="text-gray-500 hover:text-white text-xs">✕</button>
               )}
             </div>
-            <input
-              ref={refBras}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setPhotoBras(e.target.files?.[0] ?? null)}
-            />
+            <input ref={refBras} type="file" accept="image/*" className="hidden"
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setPhotoBras(e.target.files?.[0] ?? null)} />
           </div>
 
-          {/* Photo gens */}
           <div>
             <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">
               Photo de toi avec Sophie
@@ -146,20 +135,11 @@ export default function UploadPhotosPage() {
                 {photoGens ? photoGens.name : 'Choisir une photo…'}
               </span>
               {photoGens && (
-                <button
-                  type="button"
-                  onClick={e => { e.stopPropagation(); setPhotoGens(null); if (refGens.current) refGens.current.value = ''; }}
-                  className="text-gray-500 hover:text-white text-xs"
-                >✕</button>
+                <button type="button" onClick={e => { e.stopPropagation(); setPhotoGens(null); if (refGens.current) refGens.current.value = ''; }} className="text-gray-500 hover:text-white text-xs">✕</button>
               )}
             </div>
-            <input
-              ref={refGens}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setPhotoGens(e.target.files?.[0] ?? null)}
-            />
+            <input ref={refGens} type="file" accept="image/*" className="hidden"
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setPhotoGens(e.target.files?.[0] ?? null)} />
           </div>
 
           {!photoBras && !photoGens && prenom.trim() && (
@@ -168,7 +148,6 @@ export default function UploadPhotosPage() {
             </p>
           )}
 
-          {/* Submit */}
           <button
             type="submit"
             disabled={!canSubmit || loading}
@@ -178,14 +157,12 @@ export default function UploadPhotosPage() {
           </button>
         </form>
 
-        {/* Success */}
         {success && (
           <div className="bg-green-900/50 border border-green-600 rounded-2xl px-5 py-4 text-center">
             <p className="text-green-300 font-bold text-lg">✅ {success}</p>
           </div>
         )}
 
-        {/* Error */}
         {error && (
           <div className="bg-red-900/50 border border-red-700 rounded-2xl px-5 py-4">
             <p className="text-red-300 font-bold text-sm whitespace-pre-line">❌ {error}</p>
@@ -194,6 +171,59 @@ export default function UploadPhotosPage() {
         )}
 
       </div>
+    </div>
+  );
+}
+
+// ── Page principale avec garde mot de passe ───────────────────────────────────
+
+export default function UploadPhotosPage() {
+  const [unlocked, setUnlocked] = useState(false);
+  const [showField, setShowField] = useState(false);
+  const [pwInput, setPwInput] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (localStorage.getItem(PASSWORD_KEY) === CORRECT_PASSWORD) {
+      setUnlocked(true);
+    }
+  }, []);
+
+  const handleDoubleClick = () => {
+    setShowField(true);
+    setTimeout(() => inputRef.current?.focus(), 30);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    if (pwInput === CORRECT_PASSWORD) {
+      localStorage.setItem(PASSWORD_KEY, CORRECT_PASSWORD);
+      setUnlocked(true);
+    } else {
+      setPwInput('');
+      setShowField(false);
+    }
+  };
+
+  if (unlocked) return <UploadForm />;
+
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center bg-white cursor-default select-none"
+      onDoubleClick={handleDoubleClick}
+    >
+      <p className="text-gray-300 text-lg">Sois patient</p>
+      {showField && (
+        <input
+          ref={inputRef}
+          type="password"
+          value={pwInput}
+          onChange={e => setPwInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          autoComplete="off"
+          style={{ position: 'fixed', opacity: 0, width: 0, height: 0, top: 0, left: 0, pointerEvents: 'none' }}
+        />
+      )}
     </div>
   );
 }
