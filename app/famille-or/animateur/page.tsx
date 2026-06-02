@@ -273,43 +273,41 @@ const handleReveler = async (r: Reponse) => {
     await fetchActiveQuestion(session.id)
   }
 
-  // Vol réussi → l'équipe voleuse prend tous les points restants
   const handleVolReussi = async () => {
-  if (!question || !session) return
-  playSound('fanfare')
-  const nonReveleees = reponses.filter(r => !r.revealed)
-  for (const r of nonReveleees) {
-    await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
+    if (!question || !session) return
+    playSound('fanfare')
+    const nonReveleees = reponses.filter(r => !r.revealed)
+    for (const r of nonReveleees) {
+      await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
+    }
+    // B (voleuse) prend uniquement les points déjà révélés (par A + sa propre réponse)
+    const pointsRevelees = reponses.filter(r => r.revealed).reduce((sum, r) => sum + r.points, 0)
+    const scoreField = question.equipe_active === 1 ? 'equipe1_score' : 'equipe2_score'
+    const currentScore = question.equipe_active === 1 ? session.equipe1_score : session.equipe2_score
+    await supabase.from('famille_or_sessions').update({ [scoreField]: currentScore + pointsRevelees }).eq('id', session.id)
+    await supabase.from('famille_or_questions').update({ status: 'closed', phase: 'normal' }).eq('id', question.id)
+    await fetchActiveQuestion(session.id)
+    await fetchQuestions(session.id)
+    await fetchSession(session.id)
   }
-  // L'équipe voleuse prend TOUS les points du tableau
-  const totalPoints = reponses.reduce((sum, r) => sum + r.points, 0)
-  const scoreField = question.equipe_active === 1 ? 'equipe1_score' : 'equipe2_score'
-  const currentScore = question.equipe_active === 1 ? session.equipe1_score : session.equipe2_score
-  await supabase.from('famille_or_sessions').update({ [scoreField]: currentScore + totalPoints }).eq('id', session.id)
-  await supabase.from('famille_or_questions').update({ status: 'closed', phase: 'normal' }).eq('id', question.id)
-  await fetchActiveQuestion(session.id)
-  await fetchQuestions(session.id)
-  await fetchSession(session.id)
-}
 
-  // Vol raté → la première équipe récupère les points des réponses trouvées
- const handleVolRate = async () => {
-  if (!question || !session) return
-  const nonReveleees = reponses.filter(r => !r.revealed)
-  for (const r of nonReveleees) {
-    await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
+  const handleVolRate = async () => {
+    if (!question || !session) return
+    const nonReveleees = reponses.filter(r => !r.revealed)
+    for (const r of nonReveleees) {
+      await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
+    }
+    // A (équipe avec 3 croix) prend uniquement ses points déjà révélés avant le vol
+    const equipeAvecCroix = question.equipe_active === 1 ? 2 : 1
+    const pointsRevelesParA = reponses.filter(r => r.revealed && !nonReveleees.find(n => n.id === r.id)).reduce((sum, r) => sum + r.points, 0)
+    const scoreField = equipeAvecCroix === 1 ? 'equipe1_score' : 'equipe2_score'
+    const currentScore = equipeAvecCroix === 1 ? session.equipe1_score : session.equipe2_score
+    await supabase.from('famille_or_sessions').update({ [scoreField]: currentScore + pointsRevelesParA }).eq('id', session.id)
+    await supabase.from('famille_or_questions').update({ status: 'closed', phase: 'normal' }).eq('id', question.id)
+    await fetchActiveQuestion(session.id)
+    await fetchQuestions(session.id)
+    await fetchSession(session.id)
   }
-  // L'équipe avec 3 croix garde ses points trouvés — l'autre (voleuse) n'a rien
-  const equipeAvecCroix = question.equipe_active === 1 ? 2 : 1
-  const pointsTrouves = reponses.filter(r => r.revealed).reduce((sum, r) => sum + r.points, 0)
-  const scoreField = equipeAvecCroix === 1 ? 'equipe1_score' : 'equipe2_score'
-  const currentScore = equipeAvecCroix === 1 ? session.equipe1_score : session.equipe2_score
-  await supabase.from('famille_or_sessions').update({ [scoreField]: currentScore + pointsTrouves }).eq('id', session.id)
-  await supabase.from('famille_or_questions').update({ status: 'closed', phase: 'normal' }).eq('id', question.id)
-  await fetchActiveQuestion(session.id)
-  await fetchQuestions(session.id)
-  await fetchSession(session.id)
-}
 
   const handleTerminer = async () => {
     if (!session || !roomId) return
