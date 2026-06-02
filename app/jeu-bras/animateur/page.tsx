@@ -1,14 +1,14 @@
 'use client'
-// app/photos-gens/animateur/page.tsx
+// app/jeu-bras/animateur/page.tsx
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
-const ROOM_CODE = 'photos-gens'
+const ROOM_CODE = 'jeu-bras'
 
 type Player = { id: string; name: string; score: number }
 
-export default function PhotosGensAnimateur() {
+export default function JeuBrasAnimateur() {
   const [roomId, setRoomId]   = useState<string | null>(null)
   const [status, setStatus]   = useState<string>('waiting')
   const [players, setPlayers] = useState<Player[]>([])
@@ -38,14 +38,14 @@ export default function PhotosGensAnimateur() {
 
       // Realtime joueurs
       const ch = supabase
-        .channel(`animateur-photos-gens-${data.id}`)
-        .on('postgres_changes', {
-          event: '*', schema: 'public', table: 'players',
-          filter: `room_id=eq.${data.id}`,
-        }, () => fetchPlayers(data.id))
-        .subscribe()
+  .channel(`animateur-bras-${data.id}`)
+  .on('postgres_changes', {
+    event: '*', schema: 'public', table: 'players',
+    filter: `room_id=eq.${data.id}`,
+  }, () => fetchPlayers(data.id))
+  .subscribe()
 
-      return () => { supabase.removeChannel(ch) }
+return () => { supabase.removeChannel(ch) }
     }
     init()
     setInterval(() => {
@@ -67,8 +67,8 @@ export default function PhotosGensAnimateur() {
   }
 
   const gameUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/photos-gens`
-    : 'cater40.vercel.app/photos-gens'
+    ? `${window.location.origin}/jeu-bras`
+    : 'cater40.vercel.app/jeu-bras'
 
   if (loading) {
     return (
@@ -85,7 +85,7 @@ export default function PhotosGensAnimateur() {
         {/* Header */}
         <div className="flex items-center justify-between pt-2">
           <div>
-            <h1 className="text-xl font-bold">📸 Photos Gens</h1>
+            <h1 className="text-xl font-bold">💪 Gros Bras</h1>
             <p className="text-white/40 text-sm">Interface animateur</p>
           </div>
           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${

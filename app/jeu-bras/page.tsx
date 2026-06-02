@@ -1,17 +1,19 @@
 'use client'
-// app/photos-gens/page.tsx
+// app/jeu-bras/page.tsx
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getResultLevel } from '@/lib/jeu-photos-gens-data'
+import { getResultLevel } from '@/lib/jeu-bras-data'
 
-const ROOM_CODE = 'photos-gens'
+const ROOM_CODE = 'jeu-bras'
 
-const PHOTOS: { id: number; file: string; nom: string }[] = [
+const PHOTOS = [
+  { id: 1, file: '1.jpg', nom: 'Cater' },
+  { id: 2, file: '2.jpg', nom: 'Sophie' },
   // ← ajouter les vraies photos ici
 ]
 
-export default function PhotosGens() {
+export default function JeuBras() {
   const [step, setStep]         = useState<'prenom' | 'attente' | 'jeu' | 'fin'>('prenom')
   const [prenom, setPrenom]     = useState('')
   const [playerId, setPlayerId] = useState<string | null>(null)
@@ -40,7 +42,7 @@ export default function PhotosGens() {
   useEffect(() => {
     if (!roomId) return
     const channel = supabase
-      .channel(`photos-gens-status-${roomId}`)
+      .channel(`jeu-bras-status-${roomId}`)
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'rooms',
         filter: `id=eq.${roomId}`,
@@ -90,9 +92,9 @@ export default function PhotosGens() {
     return (
       <main className="min-h-screen bg-[#0f0f1a] flex flex-col items-center justify-center p-6 text-white">
         <div className="w-full max-w-sm space-y-6 text-center">
-          <div className="text-6xl">📸</div>
-          <h1 className="text-2xl font-bold">Photos Gens</h1>
-          <p className="text-white/50 text-sm">À qui appartient cette photo ?</p>
+          <div className="text-6xl">💪</div>
+          <h1 className="text-2xl font-bold">Gros Bras</h1>
+          <p className="text-white/50 text-sm">À qui appartient ce bras ?</p>
           <input
             value={prenom}
             onChange={e => setPrenom(e.target.value)}
@@ -144,15 +146,15 @@ export default function PhotosGens() {
           {/* Photo */}
           <div className="rounded-2xl overflow-hidden border border-white/10 aspect-square bg-white/5">
             <img
-              src={`/images/jeu-photos-gens/${photo.file}`}
-              alt="Photo mystère"
+              src={`/images/jeu-bras/${photo.file}`}
+              alt="Bras mystère"
               className="w-full h-full object-cover"
             />
           </div>
 
           {/* Prénom */}
           <div className="text-center space-y-1">
-            <p className="text-white/50 text-sm">C&apos;est la photo de…</p>
+            <p className="text-white/50 text-sm">C&apos;est le bras de…</p>
             <p className="text-2xl font-bold">{photo.nom}</p>
           </div>
 

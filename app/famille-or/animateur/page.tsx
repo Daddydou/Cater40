@@ -37,7 +37,7 @@ type Reponse = {
 
 function playSound(type: 'ding' | 'buzzer' | 'fanfare' | 'victoire') {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
     osc.connect(gain); gain.connect(ctx.destination)
@@ -66,7 +66,7 @@ export default function FamilleOrAnimateur() {
   const fetchPlayers = useCallback(async (rid: string) => {
     const { data } = await supabase
       .from('players').select('id, name, score').eq('room_id', rid).order('created_at')
-    if (data) setPlayers(data.map(p => ({ ...p, equipe: (p as any).equipe ?? null })))
+    if (data) setPlayers(data.map(p => ({ ...p, equipe: (p as { equipe?: number | null }).equipe ?? null })))
   }, [])
 
   const fetchActiveQuestion = useCallback(async (sessionId: string) => {
@@ -181,7 +181,7 @@ export default function FamilleOrAnimateur() {
 
   // Assigner un joueur à une équipe
   const handleAssignerEquipe = async (playerId: string, equipe: number | null) => {
-    await supabase.from('players').update({ equipe } as any).eq('id', playerId)
+    await supabase.from('players').update({ equipe } as Record<string, unknown>).eq('id', playerId)
     setPlayers(ps => ps.map(p => p.id === playerId ? { ...p, equipe } : p))
   }
 

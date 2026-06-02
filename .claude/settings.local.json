@@ -27,7 +27,10 @@
       "Bash(npm run *)",
       "Bash(Get-ChildItem -Path C:\\\\Users\\\\lolor\\\\cater40 -Recurse -Directory)",
       "Bash(dir \"C:\\\\Users\\\\lolor\\\\cater40\\\\app\\\\room\\\\[code]\")",
-      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\lolor\\\\cater40\\\\app\\\\games\\\\cater-en-or\")"
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\lolor\\\\cater40\\\\app\\\\games\\\\cater-en-or\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\lolor\\\\Cater40\\\\src\\\\app\\\\games\" -Directory)",
+      "Bash(Select-Object Name)",
+      "PowerShell(New-Item *)"
     ]
   }
 }
