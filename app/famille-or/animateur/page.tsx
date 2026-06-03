@@ -4,10 +4,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { defaultQuestions } from '@/lib/famille-or-data'
+import PlayerAvatar from '@/lib/components/PlayerAvatar'
 
 const ROOM_CODE = 'famille-or'
 
-type Player  = { id: string; name: string; equipe: number | null }
+type Player  = { id: string; name: string; equipe: number | null; avatar_url?: string | null }
 type Session = {
   id: string
   equipe1_nom: string
@@ -65,7 +66,7 @@ export default function FamilleOrAnimateur() {
 
   const fetchPlayers = useCallback(async (rid: string) => {
     const { data } = await supabase
-      .from('players').select('id, name, score').eq('room_id', rid).order('created_at')
+      .from('players').select('id, name, score, avatar_url').eq('room_id', rid).order('created_at')
     if (data) setPlayers(data.map(p => ({ ...p, equipe: (p as { equipe?: number | null }).equipe ?? null })))
   }, [])
 
@@ -375,7 +376,8 @@ const handleReveler = async (r: Reponse) => {
             {players.length === 0
               ? <p className="text-white/25 text-sm text-center py-2">En attente des joueurs…</p>
               : players.map(p => (
-                <div key={p.id} className="flex items-center justify-between">
+                <div key={p.id} className="flex items-center gap-2">
+                  <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={32} />
                   <span className="font-medium">{p.name}</span>
                 </div>
               ))

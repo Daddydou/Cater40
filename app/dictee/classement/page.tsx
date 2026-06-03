@@ -3,10 +3,11 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import PlayerAvatar from '@/lib/components/PlayerAvatar'
 
 const ROOM_CODE = 'dictee'
 
-type Player = { id: string; name: string; score: number }
+type Player = { id: string; name: string; score: number; avatar_url?: string | null }
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
@@ -24,7 +25,7 @@ export default function DicteeClassement() {
         .from('rooms').select('id').eq('code', ROOM_CODE).single()
       if (!room) return
       const { data } = await supabase
-        .from('players').select('id, name, score')
+        .from('players').select('id, name, score, avatar_url')
         .eq('room_id', room.id)
         .order('score', { ascending: true }) // du moins bon au meilleur = suspense
       if (data) setPlayers(data)
@@ -106,6 +107,7 @@ export default function DicteeClassement() {
                   }`}>
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">{medal}</span>
+                      <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={36} />
                       <span className="font-semibold text-lg">{p.name}</span>
                     </div>
                     <span className="text-2xl font-bold tabular-nums">{p.score}/20</span>

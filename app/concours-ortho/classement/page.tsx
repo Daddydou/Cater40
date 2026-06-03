@@ -3,10 +3,11 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import PlayerAvatar from '@/lib/components/PlayerAvatar'
 
 const ROOM_CODE = 'concours-ortho'
 
-type Player = { id: string; name: string; score: number }
+type Player = { id: string; name: string; score: number; avatar_url?: string | null }
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
@@ -27,7 +28,7 @@ useEffect(() => {
     console.log('Room ID:', room.id)
 
     const { data, error } = await supabase
-      .from('players').select('id, name, score')
+      .from('players').select('id, name, score, avatar_url')
       .eq('room_id', room.id)
       .order('score', { ascending: true })
     
@@ -128,6 +129,7 @@ useEffect(() => {
                   }`}>
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">{medal}</span>
+                      <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={36} />
                       <span className="font-semibold text-lg">{p.name}</span>
                     </div>
                     <span className="text-2xl font-bold tabular-nums">{p.score} pts</span>

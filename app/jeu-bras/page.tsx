@@ -1,9 +1,11 @@
 'use client'
 // app/jeu-bras/page.tsx
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getResultLevel } from '@/lib/jeu-bras-data'
+import PlayerAvatar from '@/lib/components/PlayerAvatar'
+import { uploadAvatar } from '@/lib/hooks/useAvatarUpload'
 
 const ROOM_CODE = 'jeu-bras'
 
@@ -21,6 +23,16 @@ export default function JeuBras() {
   const [status, setStatus]     = useState<string>('waiting')
   const [current, setCurrent]   = useState(0)
   const [score, setScore]       = useState(0)
+  const [avatarFile, setAvatarFile]     = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const avatarRef = useRef<HTMLInputElement>(null)
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAvatarFile(file)
+    setAvatarPreview(URL.createObjectURL(file))
+  }
 
   // Charger la room fixe au montage
   useEffect(() => {
@@ -65,6 +77,10 @@ export default function JeuBras() {
       .single()
     if (data) {
       setPlayerId(data.id)
+      if (avatarFile) {
+        const url = await uploadAvatar(avatarFile, roomId!, data.id)
+        if (url) await supabase.from('players').update({ avatar_url: url }).eq('id', data.id)
+      }
       setStep(status === 'playing' ? 'jeu' : 'attente')
     }
   }
@@ -103,6 +119,17 @@ export default function JeuBras() {
             className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-center text-lg outline-none focus:border-white/50 transition-colors"
             autoFocus
           />
+          {/* Avatar optionnel */}
+          <div className="flex flex-col items-center gap-3">
+            <div onClick={() => avatarRef.current?.click()} className="cursor-pointer">
+              <PlayerAvatar name={prenom || '?'} avatarUrl={avatarPreview} size={72} />
+            </div>
+            <button type="button" onClick={() => avatarRef.current?.click()}
+              className="text-xs text-white/40 hover:text-white/70 transition-colors">
+              {avatarPreview ? '📷 Changer la photo' : '📷 Ajouter une photo (optionnel)'}
+            </button>
+            <input ref={avatarRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+          </div>
           <button
             onClick={handleJoin}
             disabled={!prenom.trim()}

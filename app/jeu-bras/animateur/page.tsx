@@ -3,10 +3,11 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import PlayerAvatar from '@/lib/components/PlayerAvatar'
 
 const ROOM_CODE = 'jeu-bras'
 
-type Player = { id: string; name: string; score: number }
+type Player = { id: string; name: string; score: number; avatar_url?: string | null }
 
 export default function JeuBrasAnimateur() {
   const [roomId, setRoomId]   = useState<string | null>(null)
@@ -17,7 +18,7 @@ export default function JeuBrasAnimateur() {
   const fetchPlayers = useCallback(async (rid: string) => {
     const { data } = await supabase
       .from('players')
-      .select('id, name, score')
+      .select('id, name, score, avatar_url')
       .eq('room_id', rid)
       .order('score', { ascending: false })
     if (data) setPlayers(data)
@@ -123,6 +124,7 @@ return () => { supabase.removeChannel(ch) }
               <div key={p.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-white/30 text-xs w-5 text-right">{i + 1}.</span>
+                  <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={32} />
                   <span className="font-medium">{p.name}</span>
                 </div>
                 <span className="text-white/50 text-sm tabular-nums">{p.score} pts</span>

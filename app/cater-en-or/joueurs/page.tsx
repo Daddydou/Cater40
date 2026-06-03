@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useWakeLock } from '@/lib/hooks/useWakeLock'
+import PlayerAvatar from '@/lib/components/PlayerAvatar'
+import { uploadAvatar } from '@/lib/hooks/useAvatarUpload'
 
 const ROOM_CODE = 'cater-en-or'
 
@@ -48,6 +50,16 @@ export default function CaterEnOrPage() {
   const [loading, setLoading] = useState(true)
   const [nameInput, setNameInput] = useState('')
   const [joining, setJoining] = useState(false)
+  const [avatarFile, setAvatarFile]       = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const avatarRef = useRef<HTMLInputElement>(null)
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAvatarFile(file)
+    setAvatarPreview(URL.createObjectURL(file))
+  }
 
   const fetchQuestions = useCallback(async (sessionId: string) => {
     const { data } = await supabase
@@ -131,6 +143,10 @@ export default function CaterEnOrPage() {
       setPlayer(p)
       localStorage.setItem(STORAGE_PLAYER, p.id)
       localStorage.setItem(STORAGE_SESSION, session.id)
+      if (avatarFile) {
+        const url = await uploadAvatar(avatarFile, session.id, p.id)
+        if (url) await supabase.from('cater_players').update({ avatar_url: url }).eq('id', p.id)
+      }
     }
     setJoining(false)
   }
@@ -203,6 +219,17 @@ export default function CaterEnOrPage() {
                 placeholder="Ton prénom"
                 autoFocus
               />
+              {/* Avatar optionnel */}
+              <div className="flex flex-col items-center gap-3 mb-4">
+                <div onClick={() => avatarRef.current?.click()} className="cursor-pointer">
+                  <PlayerAvatar name={nameInput || '?'} avatarUrl={avatarPreview} size={72} />
+                </div>
+                <button type="button" onClick={() => avatarRef.current?.click()}
+                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+                  {avatarPreview ? '📷 Changer la photo' : '📷 Ajouter une photo (optionnel)'}
+                </button>
+                <input ref={avatarRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+              </div>
               <button
                 onClick={joinGame}
                 disabled={!nameInput.trim() || joining}

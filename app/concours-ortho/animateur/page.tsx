@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { defaultQuestions } from '@/lib/concours-ortho-data'
+import PlayerAvatar from '@/lib/components/PlayerAvatar'
 
 const ROOM_CODE = 'concours-ortho'
 
@@ -27,7 +28,7 @@ type Reponse = {
   ortho_questions: { question: string }
 }
 
-type Player = { id: string; name: string; score: number }
+type Player = { id: string; name: string; score: number; avatar_url?: string | null }
 
 export default function ConcursOrthoAnimateur() {
   const [roomId, setRoomId]         = useState<string | null>(null)
@@ -43,7 +44,7 @@ export default function ConcursOrthoAnimateur() {
 
   const fetchPlayers = useCallback(async (rid: string) => {
     const { data } = await supabase
-      .from('players').select('id, name, score')
+      .from('players').select('id, name, score, avatar_url')
       .eq('room_id', rid).order('score', { ascending: false })
     if (data) setPlayers(data)
   }, [])
@@ -218,7 +219,11 @@ export default function ConcursOrthoAnimateur() {
             ? <p className="text-white/25 text-sm text-center py-2">Aucun joueur</p>
             : players.map((p, i) => (
               <div key={p.id} className="flex justify-between items-center">
-                <span>{i + 1}. {p.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-white/30 text-xs">{i + 1}.</span>
+                  <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={32} />
+                  <span>{p.name}</span>
+                </div>
                 <span className="text-white/50 text-sm tabular-nums">{p.score} pts</span>
               </div>
             ))

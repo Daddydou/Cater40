@@ -3,12 +3,13 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import PlayerAvatar from '@/lib/components/PlayerAvatar'
 
 const ROOM_CODE = 'dictee'
 
 const TEXTE_DICTEE = `Les orthophonistes travaillent quotidiennement avec des patients qui présentent des troubles du langage. Ils évaluent, diagnostiquent et traitent ces difficultés avec patience et bienveillance. Chaque séance est une opportunité de progresser ensemble vers une meilleure communication.`
 
-type Player = { id: string; name: string; score: number }
+type Player = { id: string; name: string; score: number; avatar_url?: string | null }
 type Copy   = { id: string; player_id: string; image_url: string; status: string; players: { name: string } }
 
 export default function DicteeAnimateur() {
@@ -22,7 +23,7 @@ export default function DicteeAnimateur() {
 
   const fetchPlayers = useCallback(async (rid: string) => {
     const { data } = await supabase
-      .from('players').select('id, name, score')
+      .from('players').select('id, name, score, avatar_url')
       .eq('room_id', rid).order('created_at')
     if (data) setPlayers(data)
   }, [])
@@ -199,7 +200,10 @@ export default function DicteeAnimateur() {
               const hasCopy = copies.some(c => c.player_id === p.id && c.image_url)
               return (
                 <div key={p.id} className="flex justify-between items-center">
-                  <span>{p.name}</span>
+                  <div className="flex items-center gap-2">
+                    <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={32} />
+                    <span>{p.name}</span>
+                  </div>
                   {sessionStatus === 'uploading' && (
                     <span className={`text-xs ${hasCopy ? 'text-green-400' : 'text-white/30'}`}>
                       {hasCopy ? '📸 Reçue' : '⏳ En attente'}
