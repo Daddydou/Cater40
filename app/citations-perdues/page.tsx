@@ -39,6 +39,7 @@ interface GameSession {
   points: number;
   lettres_achetees: string[];
   associations: Record<string, number | null>;
+  completees?: boolean[];
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -51,6 +52,10 @@ function isAlpha(char: string): boolean {
   return /^[A-Z]$/.test(normalizeLetter(char));
 }
 
+function normalizePhrase(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+}
+
 // ── Composant ─────────────────────────────────────────────────────────────────
 
 export default function CitationsPerduesPage() {
@@ -61,7 +66,12 @@ export default function CitationsPerduesPage() {
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [pointsInput, setPointsInput] = useState('0');
+  const [completees, setCompletees] = useState<boolean[]>(() => PHRASES.map(() => false));
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [completeInputs, setCompleteInputs] = useState<string[]>(() => PHRASES.map(() => ''));
+  const [wrongIdx, setWrongIdx] = useState<number | null>(null);
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrongTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Fetch session ────────────────────────────────────────────────────────────
 
@@ -76,6 +86,14 @@ export default function CitationsPerduesPage() {
     if (data) {
       setSession(data as GameSession);
       setPointsInput(String(data.points));
+      if (Array.isArray(data.completees)) {
+        setCompletees(data.completees);
+      } else {
+        try {
+          const stored = localStorage.getItem('citations-completees');
+          if (stored) setCompletees(JSON.parse(stored));
+        } catch {}
+      }
     }
     setLoading(false);
   }, []);
@@ -85,12 +103,13 @@ export default function CitationsPerduesPage() {
   const createSession = async () => {
     const { data } = await supabase
       .from('citations_game')
-      .insert({ points: 0, lettres_achetees: [], associations: {} })
+      .insert({ points: 0, lettres_achetees: [], associations: {}, completees: PHRASES.map(() => false) })
       .select()
       .single();
     if (data) {
       setSession(data as GameSession);
       setPointsInput('0');
+      setCompletees(PHRASES.map(() => false));
     }
   };
 
@@ -171,22 +190,47 @@ export default function CitationsPerduesPage() {
 
   const resetGame = async () => {
     if (!session) return;
-    const fresh = { points: 0, lettres_achetees: [] as string[], associations: {} };
+    const freshCompletees = PHRASES.map(() => false);
+    const fresh = { points: 0, lettres_achetees: [] as string[], associations: {}, completees: freshCompletees };
     setSession(prev => prev ? { ...prev, ...fresh } : prev);
     setPointsInput('0');
+    setCompletees(freshCompletees);
+    setOpenIdx(null);
+    setCompleteInputs(PHRASES.map(() => ''));
     await supabase.from('citations_game').update(fresh).eq('id', session.id);
+    try { localStorage.removeItem('citations-completees'); } catch {}
+  };
+
+  const completePhrase = async (idx: number) => {
+    if (!session) return;
+    if (normalizePhrase(completeInputs[idx]) !== normalizePhrase(PHRASES[idx])) {
+      setWrongIdx(idx);
+      if (wrongTimer.current) clearTimeout(wrongTimer.current);
+      wrongTimer.current = setTimeout(() => setWrongIdx(null), 2000);
+      return;
+    }
+    const newCompletees = completees.map((v, i) => i === idx ? true : v);
+    setCompletees(newCompletees);
+    setOpenIdx(null);
+    const { error } = await supabase
+      .from('citations_game')
+      .update({ completees: newCompletees })
+      .eq('id', session.id);
+    if (error) {
+      try { localStorage.setItem('citations-completees', JSON.stringify(newCompletees)); } catch {}
+    }
   };
 
   // ── Rendu d'une phrase masquée ────────────────────────────────────────────
 
-  const renderPhrase = (phrase: string, achetees: string[]) =>
+  const renderPhrase = (phrase: string, achetees: string[], completed = false) =>
     phrase.split('').map((char, i) => {
       if (char === ' ')
         return <span key={i} className="inline-block w-3" />;
       if (!isAlpha(char))
         return <span key={i} className="text-gray-400 mx-px">{char}</span>;
       const norm = normalizeLetter(char);
-      return achetees.includes(norm)
+      return (completed || achetees.includes(norm))
         ? <span key={i} className="text-yellow-300 font-bold mx-px">{char.toUpperCase()}</span>
         : <span key={i} className="text-gray-700 mx-px select-none">_</span>;
     });
@@ -285,14 +329,61 @@ export default function CitationsPerduesPage() {
             <p className="text-xs text-gray-600 uppercase tracking-widest">Citations</p>
             {PHRASES.map((phrase, idx) => {
               const assoc = session.associations[String(idx)] ?? 0;
+              const done  = completees[idx] ?? false;
               return (
                 <div
                   key={idx}
                   className={`rounded-2xl px-4 py-4 space-y-3 border transition-colors ${assoc ? 'bg-green-950/60 border-green-700' : 'bg-gray-900/60 border-gray-800'}`}
                 >
                   <div className="text-base leading-loose tracking-widest" style={{ fontFamily: 'monospace' }}>
-                    {renderPhrase(phrase, session.lettres_achetees)}
+                    {renderPhrase(phrase, session.lettres_achetees, done)}
                   </div>
+
+                  {/* ── Compléter ─────────────────────────────────────── */}
+                  {done ? (
+                    <p className="text-green-400 text-xs font-bold" style={{ fontFamily: 'sans-serif' }}>✅ Complétée !</p>
+                  ) : openIdx === idx ? (
+                    <div className="space-y-2" style={{ fontFamily: 'sans-serif' }}>
+                      <div className="flex gap-2">
+                        <input
+                          autoFocus
+                          value={completeInputs[idx]}
+                          onChange={e => {
+                            const next = [...completeInputs];
+                            next[idx] = e.target.value;
+                            setCompleteInputs(next);
+                          }}
+                          onKeyDown={e => e.key === 'Enter' && completePhrase(idx)}
+                          placeholder="Écrire la phrase complète…"
+                          className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-yellow-500"
+                        />
+                        <button
+                          onClick={() => completePhrase(idx)}
+                          className="bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-bold px-3 py-1.5 rounded-lg text-sm transition-colors active:scale-95"
+                        >
+                          Valider
+                        </button>
+                        <button
+                          onClick={() => setOpenIdx(null)}
+                          className="text-gray-600 hover:text-gray-400 px-2 text-lg transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      {wrongIdx === idx && (
+                        <p className="text-red-400 text-xs font-bold">❌ Pas tout à fait...</p>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setOpenIdx(idx)}
+                      className="text-xs text-gray-500 hover:text-yellow-400 transition-colors"
+                      style={{ fontFamily: 'sans-serif' }}
+                    >
+                      ✏️ Compléter
+                    </button>
+                  )}
+
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-600">Photo :</span>
                     <select
