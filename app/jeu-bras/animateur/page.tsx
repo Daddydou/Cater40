@@ -1,7 +1,7 @@
 'use client'
 // app/jeu-bras/animateur/page.tsx
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import PlayerAvatar from '@/lib/components/PlayerAvatar'
 
@@ -14,6 +14,7 @@ export default function JeuBrasAnimateur() {
   const [status, setStatus]   = useState<string>('waiting')
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
+  const initialized = useRef(false)
 
   const fetchPlayers = useCallback(async (rid: string) => {
     const { data } = await supabase
@@ -25,6 +26,8 @@ export default function JeuBrasAnimateur() {
   }, [])
 
   useEffect(() => {
+    if (initialized.current) return
+    initialized.current = true
     const init = async () => {
       const { data } = await supabase
         .from('rooms')
