@@ -300,7 +300,7 @@ export default function ConcursOrthoAnimateur() {
           const questionsLibres = questions.filter(q => q.type === 'libre')
           const currentQ = questionsLibres[currentQuestionLibreIdx]
           const reponsesQ = currentQ ? reponses.filter(r => r.question_id === currentQ.id) : []
-          const allCorrected = reponsesQ.length > 0 && reponsesQ.every(r => r.is_correct !== null)
+          const allCorrected = reponsesQ.length === 0 || reponsesQ.every(r => r.is_correct !== null)
           const isLast = currentQuestionLibreIdx >= questionsLibres.length - 1
 
           return (
