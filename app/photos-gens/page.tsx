@@ -8,7 +8,8 @@ import { getResultLevel } from '@/lib/jeu-photos-gens-data'
 const ROOM_CODE = 'photos-gens'
 
 const PHOTOS: { id: number; file: string; nom: string }[] = [
-  // ← ajouter les vraies photos ici
+  { id: 1, file: '1.jpg', nom: 'Cater' },
+  { id: 2, file: '2.jpg', nom: 'Sophie' },
 ]
 
 export default function PhotosGens() {
@@ -82,7 +83,7 @@ export default function PhotosGens() {
   }
 
   const pct    = PHOTOS.length > 0 ? Math.round((score / PHOTOS.length) * 100) : 0
-  const photo  = PHOTOS[current]
+  const photo  = PHOTOS.length > 0 ? PHOTOS[current] : null
   const result = getResultLevel(pct)
 
   // ── Saisie prénom ─────────────────────────────────────────
@@ -126,6 +127,7 @@ export default function PhotosGens() {
 
   // ── Jeu en cours ─────────────────────────────────────────
   if (step === 'jeu') {
+    if (!photo) return null
     return (
       <main className="min-h-screen bg-[#0f0f1a] flex flex-col items-center justify-center p-4 text-white">
         <div className="w-full max-w-sm space-y-4">
@@ -144,7 +146,7 @@ export default function PhotosGens() {
           {/* Photo */}
           <div className="rounded-2xl overflow-hidden border border-white/10 aspect-square bg-white/5">
             <img
-              src={`/images/jeu-photos-gens/${photo.file}`}
+              src={`https://picsum.photos/seed/${photo.id}/400/400`}
               alt="Photo mystère"
               className="w-full h-full object-cover"
             />

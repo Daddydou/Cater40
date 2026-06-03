@@ -1,7 +1,7 @@
 'use client'
 // app/photos-gens/animateur/page.tsx
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
 const ROOM_CODE = 'photos-gens'
@@ -9,6 +9,7 @@ const ROOM_CODE = 'photos-gens'
 type Player = { id: string; name: string; score: number }
 
 export default function PhotosGensAnimateur() {
+  const initialized = useRef(false)
   const [roomId, setRoomId]   = useState<string | null>(null)
   const [status, setStatus]   = useState<string>('waiting')
   const [players, setPlayers] = useState<Player[]>([])
@@ -24,6 +25,8 @@ export default function PhotosGensAnimateur() {
   }, [])
 
   useEffect(() => {
+    if (initialized.current) return
+    initialized.current = true
     const init = async () => {
       const { data } = await supabase
         .from('rooms')
