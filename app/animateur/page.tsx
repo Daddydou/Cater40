@@ -63,6 +63,25 @@ export default function HubAnimateur() {
     }
   }, [])
 
+  const handleResetAll = async () => {
+    if (!confirm('Réinitialiser TOUS les jeux ? Tous les joueurs et scores seront supprimés.')) return
+
+    const codes = ['jeu-bras', 'concours-ortho', 'dictee', 'famille-or', 'cater-en-or', 'photos-gens', 'citations-perdues']
+    await Promise.all(codes.map(code => supabase.rpc('reset_room', { p_code: code })))
+
+    await supabase.from('citations_game').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    await supabase.from('ortho_questions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    await supabase.from('ortho_reponses').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    await supabase.from('dictee_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    await supabase.from('dictee_copies').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    await supabase.from('famille_or_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    await supabase.from('famille_or_questions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    await supabase.from('famille_or_reponses').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    await supabase.from('cater_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+
+    await fetchStatuses()
+  }
+
   const handleReset = async (code: string, nom: string) => {
     if (!confirm(`Réinitialiser ${nom} ? Tous les joueurs et scores seront supprimés.`)) return
     setResetting(code)
@@ -75,10 +94,17 @@ export default function HubAnimateur() {
     <main className="min-h-screen bg-[#0f0f1a] text-white p-6">
       <div className="max-w-lg mx-auto">
 
-        <div className="pt-4 pb-8">
+        <div className="pt-4 pb-6">
           <h1 className="text-2xl font-bold">🎛️ Hub Animateur</h1>
           <p className="text-white/40 text-sm mt-1">Vue d&apos;ensemble et accès rapide</p>
         </div>
+
+        <button
+          onClick={handleResetAll}
+          className="w-full bg-red-500/20 hover:bg-red-500/40 border border-red-500/40 text-red-300 font-bold rounded-xl py-4 transition-all active:scale-95 mb-6"
+        >
+          🔄 Tout réinitialiser avant la soirée
+        </button>
 
         <div className="space-y-3">
           {JEUX.map(jeu => (
