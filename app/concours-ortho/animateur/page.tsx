@@ -19,6 +19,7 @@ type Question = {
 
 type Reponse = {
   id: string
+  question_id: string
   player_id: string
   reponse: string
   is_correct: boolean | null
@@ -33,8 +34,9 @@ export default function ConcursOrthoAnimateur() {
   const [questions, setQuestions]   = useState<Question[]>([])
   const [players, setPlayers]       = useState<Player[]>([])
   const [reponses, setReponses]     = useState<Reponse[]>([])
-  const [phase, setPhase]           = useState<'setup' | 'questions' | 'correction' | 'classement'>('setup')
-  const [loading, setLoading]       = useState(true)
+  const [phase, setPhase]                         = useState<'setup' | 'questions' | 'correction' | 'classement'>('setup')
+  const [currentQuestionLibreIdx, setCurrentQuestionLibreIdx] = useState(0)
+  const [loading, setLoading]                     = useState(true)
   const initialized = useRef(false)
 
   const fetchPlayers = useCallback(async (rid: string) => {
@@ -54,7 +56,7 @@ export default function ConcursOrthoAnimateur() {
   const fetchReponses = useCallback(async (rid: string) => {
     const { data } = await supabase
       .from('ortho_reponses')
-      .select('id, player_id, reponse, is_correct, players(name)')
+      .select('id, question_id, player_id, reponse, is_correct, players(name)')
       .eq('room_id', rid)
     if (data) setReponses(data as unknown as Reponse[])
   }, [])
@@ -274,7 +276,7 @@ export default function ConcursOrthoAnimateur() {
 
             {!activeQ && questions.length > 0 && questions.every(q => q.status !== 'pending') && (
               <button
-                onClick={() => { setPhase('correction'); fetchReponses(roomId!) }}
+                onClick={() => { setPhase('correction'); setCurrentQuestionLibreIdx(0); fetchReponses(roomId!) }}
                 className="w-full bg-blue-500 hover:bg-blue-400 text-white font-bold rounded-xl py-4 transition-all active:scale-95"
               >
                 🔍 Passer à la correction des réponses libres
@@ -284,47 +286,91 @@ export default function ConcursOrthoAnimateur() {
         )}
 
         {/* Phase correction */}
-        {phase === 'correction' && (
-          <div className="space-y-3">
-            <p className="text-white/40 text-xs uppercase tracking-wide">
-              Réponses libres à corriger ({libresNonCorrigees.length})
-            </p>
+        {phase === 'correction' && (() => {
+          const questionsLibres = questions.filter(q => q.type === 'libre')
+          const currentQ = questionsLibres[currentQuestionLibreIdx]
+          const reponsesQ = currentQ ? reponses.filter(r => r.question_id === currentQ.id) : []
+          const allCorrected = reponsesQ.length > 0 && reponsesQ.every(r => r.is_correct !== null)
+          const isLast = currentQuestionLibreIdx >= questionsLibres.length - 1
 
-            {libresNonCorrigees.length === 0 && (
-              <p className="text-white/30 text-sm text-center py-3">Toutes les réponses sont corrigées ✅</p>
-            )}
-
-            {reponses.filter(r => r.is_correct === null).map(r => (
-              <div key={r.id} className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-2">
-                <p className="text-white/50 text-xs">{(r.players as { name?: string })?.name ?? '?'}</p>
-                <p className="text-sm font-medium">&quot;{r.reponse}&quot;</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleCorrectLibre(r.id, true, r.player_id)}
-                    className="flex-1 bg-green-500/20 hover:bg-green-500/40 border border-green-500/30 text-green-300 text-sm font-semibold rounded-lg py-2 transition-all active:scale-95"
-                  >
-                    ✅ Valide
-                  </button>
-                  <button
-                    onClick={() => handleCorrectLibre(r.id, false, r.player_id)}
-                    className="flex-1 bg-red-500/20 hover:bg-red-500/40 border border-red-500/30 text-red-300 text-sm font-semibold rounded-lg py-2 transition-all active:scale-95"
-                  >
-                    ❌ Incorrect
-                  </button>
-                </div>
+          return (
+            <div className="space-y-3">
+              {/* Compteur */}
+              <div className="flex items-center justify-between">
+                <p className="text-white/40 text-xs uppercase tracking-wide">Correction — réponses libres</p>
+                <span className="text-white/30 text-xs font-mono">
+                  {currentQuestionLibreIdx + 1} / {questionsLibres.length}
+                </span>
               </div>
-            ))}
 
-            {libresNonCorrigees.length === 0 && (
-              <button
-                onClick={handleLaunchClassement}
-                className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-4 transition-all active:scale-95"
-              >
-                🏆 Lancer le classement final
-              </button>
-            )}
-          </div>
-        )}
+              {/* Texte de la question */}
+              {currentQ && (
+                <div className="bg-teal-500/10 border border-teal-500/30 rounded-2xl px-4 py-3">
+                  <p className="text-teal-300 text-xs font-semibold mb-1">Q{currentQ.ordre} — Réponse libre</p>
+                  <p className="text-sm text-white">{currentQ.question}</p>
+                </div>
+              )}
+
+              {/* Réponses des joueurs */}
+              {reponsesQ.length === 0 && (
+                <p className="text-white/25 text-sm text-center py-3">Aucune réponse pour cette question</p>
+              )}
+
+              {reponsesQ.map(r => {
+                const nom = (r.players as { name?: string })?.name ?? '?'
+                return (
+                  <div key={r.id} className={`border rounded-xl p-3 space-y-2 transition-colors ${
+                    r.is_correct === true  ? 'bg-green-500/10 border-green-500/30' :
+                    r.is_correct === false ? 'bg-red-500/10   border-red-500/30'   :
+                                             'bg-white/5      border-white/10'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <p className="text-white/50 text-xs font-semibold">{nom}</p>
+                      {r.is_correct === true  && <span className="text-green-400 text-xs">✅ Valide</span>}
+                      {r.is_correct === false && <span className="text-red-400   text-xs">❌ Incorrect</span>}
+                    </div>
+                    <p className="text-sm font-medium">&quot;{r.reponse}&quot;</p>
+                    {r.is_correct === null && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleCorrectLibre(r.id, true, r.player_id)}
+                          className="flex-1 bg-green-500/20 hover:bg-green-500/40 border border-green-500/30 text-green-300 text-sm font-semibold rounded-lg py-2 transition-all active:scale-95"
+                        >
+                          ✅ Valide
+                        </button>
+                        <button
+                          onClick={() => handleCorrectLibre(r.id, false, r.player_id)}
+                          className="flex-1 bg-red-500/20 hover:bg-red-500/40 border border-red-500/30 text-red-300 text-sm font-semibold rounded-lg py-2 transition-all active:scale-95"
+                        >
+                          ❌ Incorrect
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              {/* Navigation */}
+              {allCorrected && !isLast && (
+                <button
+                  onClick={() => setCurrentQuestionLibreIdx(i => i + 1)}
+                  className="w-full bg-blue-500 hover:bg-blue-400 text-white font-bold rounded-xl py-4 transition-all active:scale-95"
+                >
+                  Question suivante →
+                </button>
+              )}
+
+              {allCorrected && isLast && (
+                <button
+                  onClick={handleLaunchClassement}
+                  className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-4 transition-all active:scale-95"
+                >
+                  🏆 Lancer le classement final
+                </button>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Phase classement */}
         {phase === 'classement' && (
