@@ -24,6 +24,7 @@ type Reponse = {
   reponse: string
   is_correct: boolean | null
   players: { name: string }
+  ortho_questions: { question: string }
 }
 
 type Player = { id: string; name: string; score: number }
@@ -56,7 +57,7 @@ export default function ConcursOrthoAnimateur() {
   const fetchReponses = useCallback(async (rid: string) => {
     const { data } = await supabase
       .from('ortho_reponses')
-      .select('id, question_id, player_id, reponse, is_correct, players(name)')
+      .select('id, question_id, player_id, reponse, is_correct, players(name), ortho_questions(question)')
       .eq('room_id', rid)
     if (data) setReponses(data as unknown as Reponse[])
   }, [])
@@ -318,12 +319,16 @@ export default function ConcursOrthoAnimateur() {
 
               {reponsesQ.map(r => {
                 const nom = (r.players as { name?: string })?.name ?? '?'
+                const questionTexte = (r.ortho_questions as { question?: string })?.question
                 return (
                   <div key={r.id} className={`border rounded-xl p-3 space-y-2 transition-colors ${
                     r.is_correct === true  ? 'bg-green-500/10 border-green-500/30' :
                     r.is_correct === false ? 'bg-red-500/10   border-red-500/30'   :
                                              'bg-white/5      border-white/10'
                   }`}>
+                    {questionTexte && (
+                      <p className="text-white/30 text-xs italic border-b border-white/10 pb-2">{questionTexte}</p>
+                    )}
                     <div className="flex items-center justify-between">
                       <p className="text-white/50 text-xs font-semibold">{nom}</p>
                       {r.is_correct === true  && <span className="text-green-400 text-xs">✅ Valide</span>}
