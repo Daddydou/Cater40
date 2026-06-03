@@ -169,7 +169,7 @@ export default function ConcursOrthoAnimateur() {
   }
 
   const activeQ = questions.find(q => q.status === 'active')
-  const libresNonCorrigees = reponses.filter(r => r.is_correct === null)
+
   console.log('phase actuelle:', phase, 'questions:', questions.map(q => q.status))
   const gameUrl = typeof window !== 'undefined' ? `${window.location.origin}/concours-ortho` : ''
   const classementUrl = typeof window !== 'undefined' ? `${window.location.origin}/concours-ortho/classement` : ''
