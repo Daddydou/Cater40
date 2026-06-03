@@ -170,6 +170,7 @@ export default function ConcursOrthoAnimateur() {
 
   const activeQ = questions.find(q => q.status === 'active')
   const libresNonCorrigees = reponses.filter(r => r.is_correct === null)
+  console.log('phase actuelle:', phase, 'questions:', questions.map(q => q.status))
   const gameUrl = typeof window !== 'undefined' ? `${window.location.origin}/concours-ortho` : ''
   const classementUrl = typeof window !== 'undefined' ? `${window.location.origin}/concours-ortho/classement` : ''
 
@@ -275,7 +276,7 @@ export default function ConcursOrthoAnimateur() {
               </div>
             ))}
 
-            {!activeQ && questions.length > 0 && questions.every(q => q.status !== 'pending') && (
+            {questions.length > 0 && !activeQ && questions.some(q => q.type === 'libre') && (
               <button
                 onClick={() => { setPhase('correction'); setCurrentQuestionLibreIdx(0); fetchReponses(roomId!) }}
                 className="w-full bg-blue-500 hover:bg-blue-400 text-white font-bold rounded-xl py-4 transition-all active:scale-95"
