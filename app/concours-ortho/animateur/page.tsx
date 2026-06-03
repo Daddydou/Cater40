@@ -278,7 +278,15 @@ export default function ConcursOrthoAnimateur() {
 
             {questions.length > 0 && !activeQ && questions.some(q => q.type === 'libre') && (
               <button
-                onClick={() => { setPhase('correction'); setCurrentQuestionLibreIdx(0); fetchReponses(roomId!) }}
+                onClick={() => {
+                  console.log('=== ENTREE CORRECTION ===')
+                  console.log('questions:', questions)
+                  console.log('reponses avant fetch:', reponses)
+                  fetchReponses(roomId!)
+                  console.log('reponses apres fetch:', reponses)
+                  setPhase('correction')
+                  setCurrentQuestionLibreIdx(0)
+                }}
                 className="w-full bg-blue-500 hover:bg-blue-400 text-white font-bold rounded-xl py-4 transition-all active:scale-95"
               >
                 🔍 Passer à la correction des réponses libres
