@@ -57,8 +57,14 @@ export default function Home() {
           })}
         </div>
 
-        <div className="mt-6 text-center">
-          <a href="/upload-photos" className="text-xs text-white/30 hover:text-white/60 transition-colors underline underline-offset-2">
+        <div className="mt-6 flex items-center justify-center gap-6">
+          <a href="/joueurs" className="text-sm text-white/40 hover:text-white/70 transition-colors">
+            👥 Portail joueurs
+          </a>
+          <a href="/animateur" className="text-sm text-white/40 hover:text-white/70 transition-colors">
+            🎛️ Hub animateur
+          </a>
+          <a href="/upload-photos" className="text-xs text-white/20 hover:text-white/50 transition-colors underline underline-offset-2">
             Upload photos
           </a>
         </div>
