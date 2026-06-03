@@ -298,7 +298,7 @@ export default function ConcursOrthoAnimateur() {
         {/* Phase correction */}
         {phase === 'correction' && (() => {
           const questionsLibres = questions.filter(q => q.type === 'libre')
-          console.log('questionsLibres:', questionsLibres.length, 'types:', questions.map(q => q.type))
+          console.log('questionsLibres count:', questionsLibres.length, 'tous les types:', questions.map(q => ({ ordre: q.ordre, type: q.type })))
           const currentQ = questionsLibres[currentQuestionLibreIdx]
           const reponsesQ = currentQ ? reponses.filter(r => r.question_id === currentQ.id) : []
           const allCorrected = reponsesQ.length === 0 || reponsesQ.every(r => r.is_correct !== null)
