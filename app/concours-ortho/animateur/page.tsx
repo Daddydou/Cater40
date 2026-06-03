@@ -37,6 +37,7 @@ export default function ConcursOrthoAnimateur() {
   const [reponses, setReponses]     = useState<Reponse[]>([])
   const [phase, setPhase]                         = useState<'setup' | 'questions' | 'correction' | 'classement'>('setup')
   const [currentQuestionLibreIdx, setCurrentQuestionLibreIdx] = useState(0)
+  const [bonneReponseAnim, setBonneReponseAnim]   = useState<string | null>(null)
   const [loading, setLoading]                     = useState(true)
   const initialized = useRef(false)
 
@@ -130,10 +131,15 @@ export default function ConcursOrthoAnimateur() {
 
   const handleCloseQuestion = async () => {
     if (!roomId) return
+    const reponseCorrecte = activeQ?.bonne_reponse ?? null
     await supabase.from('ortho_questions')
       .update({ status: 'closed' })
       .eq('room_id', roomId).eq('status', 'active')
     await fetchQuestions(roomId)
+    if (reponseCorrecte) {
+      setBonneReponseAnim(reponseCorrecte)
+      setTimeout(() => setBonneReponseAnim(null), 4000)
+    }
   }
 
   const handleCorrectLibre = async (reponseId: string, correct: boolean, playerId: string) => {
@@ -247,6 +253,13 @@ export default function ConcursOrthoAnimateur() {
                 >
                   ⏹ Fermer cette question
                 </button>
+              </div>
+            )}
+
+            {bonneReponseAnim && (
+              <div className="bg-green-900/60 border border-green-500/50 rounded-2xl p-4 text-center space-y-2">
+                <p className="text-green-300 text-xs font-bold uppercase tracking-widest">✅ Bonne réponse :</p>
+                <p className="text-white font-bold text-lg">{bonneReponseAnim}</p>
               </div>
             )}
 

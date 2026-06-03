@@ -1,7 +1,7 @@
 'use client'
 // app/concours-ortho/page.tsx
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { vibrate } from '@/lib/vibrate'
 
@@ -28,6 +28,8 @@ export default function ConcursOrtho() {
   const [answered, setAnswered]     = useState(false)
   const [score, setScore]           = useState(0)
   const [isOnline, setIsOnline]     = useState(true)
+  const [bonneReponse, setBonneReponse] = useState<string | null>(null)
+  const bonneReponseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Charger la room fixe
   useEffect(() => {
@@ -70,8 +72,14 @@ export default function ConcursOrtho() {
           setQuestion(payload.new as Question)
           setAnswered(false)
           setReponse('')
-        } else if (payload.new.status === 'closed' && question?.id === payload.new.id) {
-          setQuestion(null)
+        } else if (payload.new.status === 'closed') {
+          if (question?.id === payload.new.id) setQuestion(null)
+          const br = payload.new.bonne_reponse as string
+          if (br) {
+            setBonneReponse(br)
+            if (bonneReponseTimer.current) clearTimeout(bonneReponseTimer.current)
+            bonneReponseTimer.current = setTimeout(() => setBonneReponse(null), 4000)
+          }
         }
       })
       .subscribe()
@@ -234,6 +242,17 @@ useEffect(() => {
   return (
     <main className="min-h-screen bg-[#0B3D3A] flex flex-col items-center justify-center p-4 text-white">
       <OfflineBanner />
+
+      {/* Overlay bonne réponse */}
+      {bonneReponse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60">
+          <div className="w-full max-w-sm bg-green-900 border-2 border-green-400 rounded-3xl p-8 text-center space-y-4 shadow-2xl">
+            <div className="text-5xl">✅</div>
+            <p className="text-green-300 text-xs font-bold uppercase tracking-widest">Bonne réponse :</p>
+            <p className="text-white text-2xl font-bold leading-snug">{bonneReponse}</p>
+          </div>
+        </div>
+      )}
       <div className="w-full max-w-sm space-y-5">
 
         {/* Header */}
