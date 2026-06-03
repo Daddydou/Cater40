@@ -23,6 +23,7 @@ export default function JeuBrasAnimateur() {
       .eq('room_id', rid)
       .order('score', { ascending: false })
     if (data) setPlayers(data)
+    console.log('players avec avatars:', data?.map(p => ({ name: p.name, avatar_url: p.avatar_url })))
   }, [])
 
   useEffect(() => {
