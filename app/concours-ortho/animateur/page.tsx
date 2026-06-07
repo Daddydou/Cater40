@@ -268,7 +268,11 @@ export default function ConcursOrthoAnimateur() {
               </div>
             )}
 
-            {questions.map(q => (
+            {[...questions].sort((a, b) => {
+              if (a.status === 'closed' && b.status !== 'closed') return 1
+              if (a.status !== 'closed' && b.status === 'closed') return -1
+              return a.ordre - b.ordre
+            }).map(q => (
               <div key={q.id} className={`bg-white/5 border rounded-xl p-3 flex items-start justify-between gap-3 ${
                 q.status === 'active' ? 'border-teal-500/30 opacity-50' :
                 q.status === 'closed' ? 'border-white/5 opacity-40' : 'border-white/10'
@@ -281,7 +285,10 @@ export default function ConcursOrthoAnimateur() {
                     </span>
                     {q.status === 'closed' && <span className="text-xs text-white/30">✓ Terminée</span>}
                   </div>
-                  <p className="text-sm text-white/80 line-clamp-2">{q.question}</p>
+                  {q.question.includes("Chassez l'intrus")
+                    ? <p className="text-sm text-white/40 italic">— question affichée à l&apos;oral —</p>
+                    : <p className="text-sm text-white/80 line-clamp-2">{q.question}</p>
+                  }
                 </div>
                 {q.status === 'pending' && !activeQ && (
                   <button
