@@ -177,6 +177,13 @@ export default function ConcursOrthoAnimateur() {
 
   const activeQ = questions.find(q => q.status === 'active')
 
+  const getQuestionLabel = (q: Question) => {
+    if (q.question.includes("Chassez l'intrus") && q.propositions) {
+      return "Chassez l'intrus — " + q.propositions.map(p => p.replace(/^[A-E] — /, '')).join(' / ')
+    }
+    return q.question
+  }
+
   console.log('phase actuelle:', phase, 'questions:', questions.map(q => q.status))
   const gameUrl = typeof window !== 'undefined' ? `${window.location.origin}/concours-ortho` : ''
   const classementUrl = typeof window !== 'undefined' ? `${window.location.origin}/concours-ortho/classement` : ''
@@ -251,7 +258,7 @@ export default function ConcursOrthoAnimateur() {
                 <div className="flex justify-between items-center">
                   <span className="text-teal-300 text-xs font-semibold">▶️ EN COURS — Q{activeQ.ordre}</span>
                 </div>
-                <p className="text-sm">{activeQ.question}</p>
+                <p className="text-sm">{getQuestionLabel(activeQ)}</p>
                 <button
                   onClick={handleCloseQuestion}
                   className="w-full bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl py-2 text-sm font-semibold transition-all active:scale-95"
@@ -284,10 +291,7 @@ export default function ConcursOrthoAnimateur() {
                     </span>
                     {q.status === 'closed' && <span className="text-xs text-white/30">✓ Terminée</span>}
                   </div>
-                  {q.question.includes("Chassez l'intrus")
-                    ? <p className="text-sm text-white/40 italic">— question affichée à l&apos;oral —</p>
-                    : <p className="text-sm text-white/80 line-clamp-2">{q.question}</p>
-                  }
+                  <p className="text-sm text-white/80 line-clamp-2">{getQuestionLabel(q)}</p>
                 </div>
                 {q.status === 'pending' && !activeQ && (
                   <button
