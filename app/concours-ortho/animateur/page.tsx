@@ -268,13 +268,9 @@ export default function ConcursOrthoAnimateur() {
               </div>
             )}
 
-            {[...questions]
-              .filter(q => q.status !== 'active')
-              .sort((a, b) => {
-                if (a.status === 'closed' && b.status !== 'closed') return 1
-                if (a.status !== 'closed' && b.status === 'closed') return -1
-                return a.ordre - b.ordre
-              })
+            {questions
+              .filter(q => q.status === 'pending')
+              .sort((a, b) => a.ordre - b.ordre)
               .map(q => (
               <div key={q.id} className={`bg-white/5 border rounded-xl p-3 flex items-start justify-between gap-3 ${
                 q.status === 'active' ? 'border-teal-500/30 opacity-50' :
