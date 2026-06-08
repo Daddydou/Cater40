@@ -271,7 +271,7 @@ export const defaultQuestions: DefaultQuestion[] = [
       'D — bercail',
       'E — détail',
     ],
-    bonne_reponse: 'C — chandail',
+    bonne_reponse: 'B — fermail',
     explication: 'Tramail→tramaux, fermail→fermaux, bercail→bercaux. Chandail→chandails uniquement (pas de forme en -aux).',
   },
   {
@@ -381,7 +381,7 @@ export const defaultQuestions: DefaultQuestion[] = [
       'D — fui',
       'E — Toutes les formes sont correctes',
     ],
-    bonne_reponse: 'C — fuîtes-vous',
+    bonne_reponse: 'B — je fuirai',
     explication: '"Fuîtes-vous" est incorrect. Le passé simple correct est "vous fuîtes".',
   },
   {
@@ -411,7 +411,7 @@ export const defaultQuestions: DefaultQuestion[] = [
       'D — que vous marteliez',
       'E — Toutes les formes sont correctes',
     ],
-    bonne_reponse: 'E — Toutes les formes sont correctes',
+    bonne_reponse: 'B — tu martelles',
     explication: 'Martelons, tu martelles, nous aurions martelé, que vous marteliez sont toutes correctes.',
   },
   {
@@ -426,7 +426,7 @@ export const defaultQuestions: DefaultQuestion[] = [
       'D — tu t\'assis',
       'E — Toutes les formes sont correctes',
     ],
-    bonne_reponse: 'C — nous nous assiérons',
+    bonne_reponse: 'E — Toutes les formes sont correctes',
     explication: 'Le futur correct est "nous nous assiérons" ou "nous nous asseyerons". La forme proposée est incorrecte.',
   },
   {
@@ -441,7 +441,7 @@ export const defaultQuestions: DefaultQuestion[] = [
       'D — elles halètent',
       'E — Toutes les formes sont correctes',
     ],
-    bonne_reponse: 'B — j\'halèterai',
+    bonne_reponse: 'C — nous halètions',
     explication: 'Selon l\'ancienne norme, le futur s\'écrit "j\'halèterai". Forme contestée par les rectifications de 1990.',
   },
   {
@@ -456,7 +456,7 @@ export const defaultQuestions: DefaultQuestion[] = [
       'D — vous révélerez',
       'E — Toutes les formes sont correctes',
     ],
-    bonne_reponse: 'D — vous révélerez',
+    bonne_reponse: 'E — Toutes les formes sont correctes',
     explication: 'Selon les rectifications 1990, le futur s\'écrit "vous révèlerez" (accent grave). "Révélerez" avec accent aigu est l\'ancienne norme.',
   },
   {
@@ -585,7 +585,7 @@ export const defaultQuestions: DefaultQuestion[] = [
       'C — Épithète',
       'D — Attribut du complément d\'objet',
     ],
-    bonne_reponse: 'A — Attribut du sujet',
+    bonne_reponse: 'D — Attribut du complément d\'objet',
     explication: '"Mienne" est un pronom possessif, attribut dans la construction "faire sienne".',
   },
   {
@@ -642,7 +642,7 @@ export const defaultQuestions: DefaultQuestion[] = [
       'C — Pronom relatif',
       'D — Pronom indéfini',
     ],
-    bonne_reponse: 'B — Pronom personnel',
+    bonne_reponse: 'D — Pronom indéfini',
     explication: '"Y" remplace un COI (je songe à cela → j\'y songe). Pronom personnel COI.',
   },
   {
