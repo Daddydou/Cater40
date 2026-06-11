@@ -246,7 +246,7 @@ export default function Dictee() {
         <OfflineBanner />
         <div className="text-5xl mb-4 animate-pulse">🔍</div>
         <h2 className="text-xl font-semibold mb-2">Correction en cours…</h2>
-        <p className="text-white/50">L&apos;IA analyse les copies</p>
+        <p className="text-white/50">Sers une bière à Daddy s&apos;il te plaît 🍺</p>
       </main>
     )
   }
