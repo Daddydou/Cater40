@@ -23,7 +23,7 @@ interface DicteeCopy {
   status: 'pending' | 'uploaded' | 'analyzed' | 'corrected';
 }
 
-type Phase = 'loading' | 'locked' | 'ready' | 'analyzing' | 'done';
+type Phase = 'loading' | 'locked' | 'ready' | 'done';
 
 export default function DicteeAnimateurPage() {
   const { code } = useParams<{ code: string }>();
@@ -37,7 +37,6 @@ export default function DicteeAnimateurPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [statusError, setStatusError] = useState('');
-  const [analyzeProgress, setAnalyzeProgress] = useState({ done: 0, total: 0 });
 
   useEffect(() => {
     supabase.from('rooms').select('*').eq('code', code).single().then(({ data }) => {
@@ -159,48 +158,10 @@ export default function DicteeAnimateurPage() {
     setSaving(false);
   };
 
-  const handleLancerCorrectionIA = async () => {
+  const handleLancerCorrection = async () => {
     if (!session || saving) return;
     setSaving(true);
-    setPhase('analyzing');
-
     await updateSessionStatus('correcting');
-
-    const uploadedCopies = copies.filter(c => c.status === 'uploaded' && c.image_url);
-    setAnalyzeProgress({ done: 0, total: uploadedCopies.length });
-
-    for (let i = 0; i < uploadedCopies.length; i++) {
-      const copy = uploadedCopies[i];
-      try {
-        const analyzeRes = await fetch('/api/dictee/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageUrl: copy.image_url,
-            texteOriginal: session.texte_original,
-          }),
-        });
-
-        const result = await analyzeRes.json();
-
-        await supabase.from('dictee_copies').update({
-          texte_ocr: result.texte_transcrit ?? '',
-          fautes_ia: result.fautes ?? [],
-          fautes_finales: result.fautes ?? [],
-          status: 'analyzed',
-        }).eq('id', copy.id);
-      } catch {
-        await supabase.from('dictee_copies').update({
-          texte_ocr: '',
-          fautes_ia: [],
-          fautes_finales: [],
-          status: 'analyzed',
-        }).eq('id', copy.id);
-      }
-
-      setAnalyzeProgress({ done: i + 1, total: uploadedCopies.length });
-    }
-
     setSaving(false);
     router.push(`/room/${code}/dictee/correction`);
   };
@@ -244,26 +205,6 @@ export default function DicteeAnimateurPage() {
     );
   }
 
-  if (phase === 'analyzing') {
-    return (
-      <div className={`${bg} flex flex-col items-center justify-center gap-6`}>
-        <div className="text-6xl animate-bounce">🤖</div>
-        <h1 className="text-2xl font-extrabold text-white">Analyse IA en cours…</h1>
-        <p className="text-teal-300 text-lg">
-          {analyzeProgress.done} / {analyzeProgress.total} copies analysées
-        </p>
-        <div className="w-64 bg-white/10 rounded-full h-3 overflow-hidden">
-          <div
-            className="bg-gradient-to-r from-teal-400 to-cyan-500 h-3 rounded-full transition-all duration-500"
-            style={{
-              width: `${analyzeProgress.total ? (analyzeProgress.done / analyzeProgress.total) * 100 : 0}%`,
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={`${bg} flex flex-col items-center`}>
       <div className="w-full max-w-sm flex flex-col gap-5">
@@ -286,7 +227,7 @@ export default function DicteeAnimateurPage() {
               {sessionStatus === 'waiting' && '⏳ En attente du lancement'}
               {sessionStatus === 'writing' && '📝 Dictée en cours'}
               {sessionStatus === 'uploading' && '📸 Remise des copies'}
-              {sessionStatus === 'correcting' && '🔍 Correction IA'}
+              {sessionStatus === 'correcting' && '✍️ Correction en cours'}
               {sessionStatus === 'finished' && '✅ Terminé'}
             </p>
           </div>
@@ -353,11 +294,11 @@ export default function DicteeAnimateurPage() {
 
         {sessionStatus === 'uploading' && (
           <button
-            onClick={handleLancerCorrectionIA}
+            onClick={handleLancerCorrection}
             disabled={saving || uploadedCount === 0}
             className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-black text-base disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all duration-150 shadow-lg"
           >
-            {saving ? '⏳ Analyse en cours…' : '🤖 Lancer la correction IA'}
+            {saving ? '⏳…' : '✍️ Lancer la correction'}
           </button>
         )}
       </div>
