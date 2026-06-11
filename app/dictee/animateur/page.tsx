@@ -48,14 +48,29 @@ export default function DicteeAnimateurPage() {
     });
   }, [code]);
 
-  useEffect(() => {
+  const loadPlayers = useCallback(async () => {
     if (!room) return;
-    supabase
+    const { data } = await supabase
       .from('players')
       .select('*')
-      .eq('room_id', room.id)
-      .then(({ data }) => setPlayers((data as Player[]) ?? []));
+      .eq('room_id', room.id);
+    setPlayers((data as Player[]) ?? []);
   }, [room]);
+
+  useEffect(() => { loadPlayers(); }, [loadPlayers]);
+
+  useEffect(() => {
+    if (!room) return;
+    const channel = supabase
+      .channel(`dictee-anim-players-${room.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${room.id}` },
+        () => loadPlayers()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [room, loadPlayers]);
 
   const loadCopies = useCallback(async () => {
     if (!session) return;
