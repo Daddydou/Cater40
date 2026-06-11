@@ -32,6 +32,15 @@ export default function Dictee() {
     setAvatarPreview(URL.createObjectURL(file))
   }
 
+  const syncStep = (status: string) => {
+    if (!playerIdRef.current) return;
+    if (status === 'waiting')    setStep('attente')
+    if (status === 'writing')    setStep('ecriture')
+    if (status === 'uploading')  setStep('upload')
+    if (status === 'correcting') setStep('correction')
+    if (status === 'finished')   setStep('fin')
+  }
+
   // Charger la room et session
  useEffect(() => {
   const load = async () => {
@@ -60,15 +69,6 @@ export default function Dictee() {
   return () => clearInterval(interval)
 }, [])
 
-  const syncStep = (status: string) => {
-    if (!playerIdRef.current) return;
-    if (status === 'waiting')    setStep('attente')
-    if (status === 'writing')    setStep('ecriture')
-    if (status === 'uploading')  setStep('upload')
-    if (status === 'correcting') setStep('correction')
-    if (status === 'finished')   setStep('fin')
-  }
-
   // Offline/online
   useEffect(() => {
     window.addEventListener('offline', () => setIsOnline(false))
@@ -91,10 +91,12 @@ export default function Dictee() {
 
     // Chercher ou créer la session
     let sid = sessionId
+    let existing: { id: string; status: string } | null = null
     if (!sid) {
-      const { data: existing } = await supabase
+      const { data } = await supabase
         .from('dictee_sessions').select('id, status')
         .eq('room_id', roomId).order('created_at', { ascending: false }).limit(1).single()
+      existing = data
       if (existing) {
         sid = existing.id
         setSessionId(existing.id)
@@ -102,7 +104,7 @@ export default function Dictee() {
         syncStep(existing.status)
       }
     }
-    setStep(sessionStatus === 'writing' ? 'ecriture' : sessionStatus === 'uploading' ? 'upload' : 'attente')
+    setStep((existing?.status ?? 'waiting') === 'writing' ? 'ecriture' : (existing?.status ?? 'waiting') === 'uploading' ? 'upload' : 'attente')
   }
 
   // Upload copie
