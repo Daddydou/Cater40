@@ -172,23 +172,11 @@ export default function DicteeAnimateurPage() {
     for (let i = 0; i < uploadedCopies.length; i++) {
       const copy = uploadedCopies[i];
       try {
-        const res = await fetch(copy.image_url!);
-        const blob = await res.blob();
-        const base64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const result = reader.result as string;
-            resolve(result.split(',')[1]);
-          };
-          reader.readAsDataURL(blob);
-        });
-
         const analyzeRes = await fetch('/api/dictee/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            imageBase64: base64,
-            mediaType: blob.type || 'image/jpeg',
+            imageUrl: copy.image_url,
             texteOriginal: session.texte_original,
           }),
         });
