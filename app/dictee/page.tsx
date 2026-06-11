@@ -60,6 +60,7 @@ export default function Dictee() {
 }, [])
 
   const syncStep = (status: string) => {
+    if (!playerId) return;
     if (status === 'waiting')    setStep('attente')
     if (status === 'writing')    setStep('ecriture')
     if (status === 'uploading')  setStep('upload')
