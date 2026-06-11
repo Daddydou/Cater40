@@ -1,254 +1,284 @@
-'use client'
-// app/dictee/correction/page.tsx
+'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { Player, Room } from '@/types';
 
-const ROOM_CODE = 'dictee'
-
-const TEXTE_ORIGINAL = `Les orthophonistes travaillent quotidiennement avec des patients qui présentent des troubles du langage. Ils évaluent, diagnostiquent et traitent ces difficultés avec patience et bienveillance. Chaque séance est une opportunité de progresser ensemble vers une meilleure communication.`
-
-type Faute = { mot_incorrect: string; mot_correct: string; certitude: 'rouge' | 'jaune' }
-
-type CopyData = {
-  id: string
-  player_id: string
-  image_url: string
-  fautes_ia: Faute[]
-  fautes_finales: Faute[]
-  score: number
-  status: string
-  players: { name: string }
+interface DotFaute {
+  x: number; // % de la largeur de l'image
+  y: number; // % de la hauteur de l'image
 }
 
-export default function DicteeCorrection() {
-  const [sessionId, setSessionId]   = useState<string | null>(null)
-  const [copies, setCopies]         = useState<CopyData[]>([])
-  const [currentIdx, setCurrentIdx] = useState(0)
-  const [analyzing, setAnalyzing]   = useState<string | null>(null)
-  const [loading, setLoading]       = useState(true)
-  const initialized = useRef(false)
+interface DicteeCopy {
+  id: string;
+  session_id: string;
+  player_id: string;
+  image_url: string | null;
+  fautes_finales: DotFaute[];
+  score: number;
+  status: string;
+}
 
-  const fetchCopies = useCallback(async (sid: string) => {
-    const { data } = await supabase
-      .from('dictee_copies')
-      .select('id, player_id, image_url, fautes_ia, fautes_finales, score, status, players(name)')
-      .eq('session_id', sid)
-      .order('created_at')
-    if (data) setCopies(data as unknown as CopyData[])
-  }, [])
+interface DicteeSession {
+  id: string;
+  room_id: string;
+  texte_original: string;
+  status: string;
+}
+
+function getPublicImageUrl(storedUrl: string): string {
+  const marker = '/storage/v1/object/public/dictee-copies/';
+  const idx = storedUrl.indexOf(marker);
+  if (idx === -1) return storedUrl;
+  const path = storedUrl.slice(idx + marker.length);
+  const { data } = supabase.storage.from('dictee-copies').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+export default function CorrectionPage() {
+  const { code } = useParams<{ code: string }>();
+  const router = useRouter();
+
+  const [room, setRoom] = useState<Room | null>(null);
+  const [session, setSession] = useState<DicteeSession | null>(null);
+  const [copies, setCopies] = useState<DicteeCopy[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [dots, setDots] = useState<DotFaute[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const imgRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (initialized.current) return
-    initialized.current = true
+    supabase.from('rooms').select('*').eq('code', code).single().then(({ data }) => {
+      if (data) setRoom(data as Room);
+      else setError('Salle introuvable.');
+    });
+  }, [code]);
 
-    const init = async () => {
-      const { data: room } = await supabase
-        .from('rooms').select('id').eq('code', ROOM_CODE).single()
-      if (!room) return
+  const loadData = useCallback(async () => {
+    if (!room) return;
 
-      const { data: session } = await supabase
-        .from('dictee_sessions').select('id')
-        .eq('room_id', room.id).order('created_at', { ascending: false }).limit(1).single()
-      if (!session) return
+    const { data: sessionData } = await supabase
+      .from('dictee_sessions')
+      .select('*')
+      .eq('room_id', room.id)
+      .maybeSingle();
 
-      setSessionId(session.id)
-      await fetchCopies(session.id)
-      setLoading(false)
+    if (!sessionData) { setLoading(false); return; }
+    setSession(sessionData as DicteeSession);
+
+    const { data: copiesData } = await supabase
+      .from('dictee_copies')
+      .select('*')
+      .eq('session_id', sessionData.id)
+      .in('status', ['uploaded', 'analyzed', 'corrected']);
+
+    setCopies((copiesData as DicteeCopy[]) ?? []);
+
+    const { data: playersData } = await supabase
+      .from('players')
+      .select('*')
+      .eq('room_id', room.id);
+
+    setPlayers((playersData as Player[]) ?? []);
+    setLoading(false);
+  }, [room]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // Reset dots quand on change de copie
+  useEffect(() => {
+    setDots([]);
+  }, [currentIndex]);
+
+  const currentCopy = copies[currentIndex];
+  const currentPlayer = players.find(p => p.id === currentCopy?.player_id);
+  const score = 20 - dots.length;
+
+  const handleImageClick = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    if (!imgRef.current) return;
+    const rect = imgRef.current.getBoundingClientRect();
+    let clientX: number, clientY: number;
+
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
     }
-    init()
-  }, [fetchCopies])
 
-  // Analyser une copie avec Claude Vision
-  const analyzeWithAI = async (copy: CopyData) => {
-    if (analyzing) return
-    setAnalyzing(copy.id)
-    try {
-      const res = await fetch('/api/dictee/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: copy.image_url, texteOriginal: TEXTE_ORIGINAL }),
-      })
-      const result = await res.json()
-      const fautes: Faute[] = result.fautes ?? []
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    const y = ((clientY - rect.top) / rect.height) * 100;
+    setDots(prev => [...prev, { x, y }]);
+  };
 
-      await supabase.from('dictee_copies').update({
-        fautes_ia: fautes,
-        fautes_finales: fautes,
-        score: Math.max(0, 20 - fautes.filter(f => f.certitude === 'rouge').length),
-        status: 'analyzed',
-      }).eq('id', copy.id)
+  const handleUndo = () => {
+    setDots(prev => prev.slice(0, -1));
+  };
 
-      if (sessionId) await fetchCopies(sessionId)
-    } catch (e) {
-      console.error('Erreur analyse IA:', e)
+  const handleLancerClassement = useCallback(async () => {
+    if (!room || !session) return;
+
+    const { data: finalCopies } = await supabase
+      .from('dictee_copies')
+      .select('*')
+      .eq('session_id', session.id)
+      .eq('status', 'corrected');
+
+    for (const copy of (finalCopies as DicteeCopy[]) ?? []) {
+      await supabase.from('players').update({ score: copy.score }).eq('id', copy.player_id);
     }
-    setAnalyzing(null)
-  }
 
-  // Confirmer / annuler une faute
-  const toggleFaute = async (copy: CopyData, faute: Faute, keep: boolean) => {
-    const newFautes = keep
-      ? [...copy.fautes_finales, faute]
-      : copy.fautes_finales.filter(f => f.mot_incorrect !== faute.mot_incorrect)
-    const newScore = Math.max(0, 20 - newFautes.filter(f => f.certitude === 'rouge').length - newFautes.filter(f => f.certitude === 'jaune').length)
+    await supabase.from('dictee_sessions').update({ status: 'finished' }).eq('id', session.id);
+    await supabase.from('rooms').update({ current_game: 'dictee:classement:0' }).eq('id', room.id);
+
+    router.push(`/room/${code}/dictee/classement?a=1`);
+  }, [room, session, code, router]);
+
+  const handleValiderCopie = async () => {
+    if (!currentCopy || saving) return;
+    setSaving(true);
+
+    const score = 20 - dots.length;
 
     await supabase.from('dictee_copies').update({
-      fautes_finales: newFautes,
-      score: newScore,
-    }).eq('id', copy.id)
+      fautes_finales: dots,
+      score,
+      status: 'corrected',
+    }).eq('id', currentCopy.id);
 
-    await supabase.from('players').update({ score: newScore }).eq('id', copy.player_id)
-    if (sessionId) await fetchCopies(sessionId)
-  }
+    if (currentIndex < copies.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+      setSaving(false);
+    } else {
+      await handleLancerClassement();
+      setSaving(false);
+    }
+  };
 
-
-  // Valider une copie
-  const validateCopy = async (copy: CopyData) => {
-    await supabase.from('dictee_copies').update({ status: 'corrected' }).eq('id', copy.id)
-    await supabase.from('players').update({ score: copy.score }).eq('id', copy.player_id)
-    if (sessionId) await fetchCopies(sessionId)
-    if (currentIdx < copies.length - 1) setCurrentIdx(i => i + 1)
-  }
-
-  // Lancer le classement
-  const handleClassement = async () => {
-    const { data: room } = await supabase.from('rooms').select('id').eq('code', ROOM_CODE).single()
-    if (sessionId) await supabase.from('dictee_sessions').update({ status: 'finished' }).eq('id', sessionId)
-    if (room) await supabase.from('rooms').update({ status: 'finished' }).eq('id', room.id)
-    window.location.href = '/dictee/classement'
-  }
+  const bg = 'min-h-screen bg-gradient-to-br from-blue-900 via-teal-950 to-green-900 px-4 py-6';
 
   if (loading) return (
-    <main className="min-h-screen bg-[#1a1a0f] flex items-center justify-center text-white">
-      <p className="text-white/40">Chargement…</p>
-    </main>
-  )
+    <div className={`${bg} flex items-center justify-center`}>
+      <p className="text-white text-lg animate-pulse">Chargement des copies…</p>
+    </div>
+  );
 
-  const copy = copies[currentIdx]
-  const allCorrected = copies.length > 0 && copies.every(c => c.status === 'corrected')
+  if (error) return (
+    <div className={`${bg} flex items-center justify-center`}>
+      <p className="text-red-400 text-lg text-center px-4">{error}</p>
+    </div>
+  );
+
+  if (copies.length === 0) return (
+    <div className={`${bg} flex flex-col items-center justify-center gap-4`}>
+      <p className="text-white text-lg">Aucune copie à corriger.</p>
+      <button
+        onClick={() => router.push(`/room/${code}/dictee/classement?a=1`)}
+        className="px-6 py-3 rounded-2xl bg-teal-500 text-white font-bold hover:scale-105 transition-all"
+      >
+        Aller au classement
+      </button>
+    </div>
+  );
 
   return (
-    <main className="min-h-screen bg-[#1a1a0f] text-white p-5">
-      <div className="max-w-lg mx-auto space-y-5">
+    <div className={`${bg} flex flex-col items-center`}>
+      <div className="w-full max-w-lg flex flex-col gap-4 pb-8">
 
         {/* Header */}
-        <div className="flex items-center justify-between pt-2">
+        <div className="text-center">
+          <h1 className="text-2xl font-extrabold text-white">✍️ Correction</h1>
+          <p className="text-teal-300 text-sm mt-1">
+            Copie {currentIndex + 1} / {copies.length} — <span className="font-bold text-white">{currentPlayer?.name ?? '?'}</span>
+          </p>
+        </div>
+
+        {/* Score */}
+        <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-5 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold">🔍 Correction</h1>
-            <p className="text-white/40 text-sm">
-              Copie {currentIdx + 1} / {copies.length}
+            <p className="text-teal-300 text-xs font-bold uppercase tracking-wider">Score</p>
+            <p className={`font-black text-4xl leading-none mt-1 ${score < 0 ? 'text-red-400' : 'text-white'}`}>
+              {score}
+              <span className="text-white/40 text-xl">/20</span>
             </p>
           </div>
-          {allCorrected && (
-            <button onClick={handleClassement}
-              className="bg-yellow-500 hover:bg-yellow-400 text-black text-sm font-bold px-4 py-2 rounded-xl transition-all active:scale-95">
-              🏆 Classement
+          <div className="text-right">
+            <p className="text-red-400 text-sm font-semibold">
+              {dots.length} faute{dots.length !== 1 ? 's' : ''}
+            </p>
+            <button
+              onClick={handleUndo}
+              disabled={dots.length === 0}
+              className="mt-1 text-xs text-white/40 hover:text-white/70 disabled:opacity-20 transition-colors underline"
+            >
+              ↩ Annuler le dernier
             </button>
-          )}
+          </div>
         </div>
 
-        {/* Navigation copies */}
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {copies.map((c, i) => (
-            <button key={c.id} onClick={() => setCurrentIdx(i)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                i === currentIdx ? 'bg-amber-500 text-black' :
-                c.status === 'corrected' ? 'bg-green-500/20 text-green-300' : 'bg-white/10 text-white/50'
-              }`}>
-              {(c.players as { name?: string })?.name ?? `Copie ${i + 1}`}
-              {c.status === 'corrected' && ' ✓'}
-            </button>
-          ))}
-        </div>
+        {/* Instruction */}
+        <p className="text-center text-white/50 text-xs">
+          👆 Tape sur la photo à l&apos;endroit de chaque faute
+        </p>
 
-        {copy && (
-          <div className="space-y-4">
-            {/* Photo de la copie */}
-            <div className="rounded-2xl overflow-hidden border border-white/10">
-              <img src={copy.image_url} alt="Copie" className="w-full object-contain max-h-64" />
-            </div>
-
-            {/* Texte original */}
-            <div className="bg-white/5 border border-white/10 rounded-xl p-3">
-              <p className="text-white/40 text-xs mb-1 uppercase tracking-wide">Texte original</p>
-              <p className="text-sm text-white/70 leading-relaxed">{TEXTE_ORIGINAL}</p>
-            </div>
-
-            {/* Bouton analyser */}
-            {copy.status === 'uploaded' && (
-              <button onClick={() => analyzeWithAI(copy)}
-                disabled={!!analyzing}
-                className="w-full bg-purple-500 hover:bg-purple-400 text-white font-bold rounded-xl py-3 disabled:opacity-50 transition-all active:scale-95">
-                {analyzing === copy.id ? '⏳ Analyse en cours…' : '🤖 Analyser avec l\'IA'}
-              </button>
-            )}
-
-            {/* Fautes détectées */}
-            {(copy.status === 'analyzed' || copy.status === 'corrected') && (
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <p className="text-white/40 text-xs uppercase tracking-wide">
-                    Fautes ({copy.fautes_finales.length}) — Score : {copy.score}/20
-                  </p>
-                </div>
-
-                {copy.fautes_ia.length === 0 && (
-                  <p className="text-green-400 text-sm text-center py-2">🎉 Aucune faute détectée !</p>
-                )}
-
-                {copy.fautes_ia.map((faute, i) => {
-                  const isKept = copy.fautes_finales.some(f => f.mot_incorrect === faute.mot_incorrect)
-                  return (
-                    <div key={i} className={`border rounded-xl p-3 flex items-center justify-between gap-3 ${
-                      isKept
-                        ? faute.certitude === 'rouge' ? 'bg-red-500/10 border-red-500/30' : 'bg-yellow-500/10 border-yellow-500/30'
-                        : 'bg-white/3 border-white/5 opacity-50'
-                    }`}>
-                      <div className="flex-1 min-w-0">
-                        <span className="mr-2">{faute.certitude === 'rouge' ? '🔴' : '🟡'}</span>
-                        <span className="line-through text-red-300 text-sm">{faute.mot_incorrect}</span>
-                        <span className="text-white/40 mx-2">→</span>
-                        <span className="text-green-300 text-sm">{faute.mot_correct}</span>
-                      </div>
-                      <div className="flex gap-1">
-                        <button onClick={() => toggleFaute(copy, faute, true)}
-                          className={`text-xs px-2 py-1 rounded-lg transition-all ${isKept ? 'bg-red-500/40 text-red-200' : 'bg-white/10 text-white/50'}`}>
-                          ✓
-                        </button>
-                        <button onClick={() => toggleFaute(copy, faute, false)}
-                          className={`text-xs px-2 py-1 rounded-lg transition-all ${!isKept ? 'bg-green-500/40 text-green-200' : 'bg-white/10 text-white/50'}`}>
-                          ✗
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-
-                {/* Valider */}
-                {copy.status !== 'corrected' && (
-                  <button onClick={() => validateCopy(copy)}
-                    className="w-full bg-green-500 hover:bg-green-400 text-black font-bold rounded-xl py-3 mt-2 transition-all active:scale-95">
-                    ✅ Valider cette copie (score : {copy.score}/20)
-                  </button>
-                )}
-                {copy.status === 'corrected' && (
-                  <div className="text-center text-green-400 text-sm py-2">✅ Copie validée — {copy.score}/20</div>
-                )}
+        {/* Photo interactive */}
+        {currentCopy?.image_url && (
+          <div
+            ref={imgRef}
+            className="relative w-full rounded-2xl overflow-hidden cursor-crosshair select-none"
+            style={{ touchAction: 'none' }}
+            onClick={handleImageClick}
+            onTouchStart={handleImageClick}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={getPublicImageUrl(currentCopy.image_url)}
+              alt="Copie du joueur"
+              className="w-full h-auto block pointer-events-none"
+              draggable={false}
+            />
+            {/* Ronds rouges */}
+            {dots.map((dot, i) => (
+              <div
+                key={i}
+                className="absolute pointer-events-none"
+                style={{
+                  left: `${dot.x}%`,
+                  top: `${dot.y}%`,
+                  transform: 'translate(-50%, -50%)',
+                }}
+              >
+                <div className="w-6 h-6 rounded-full bg-red-500 border-2 border-white shadow-lg opacity-80" />
               </div>
-            )}
+            ))}
           </div>
         )}
 
-        {/* Lancer classement */}
-        {allCorrected && (
-          <button onClick={handleClassement}
-            className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-4 transition-all active:scale-95">
-            🏆 Lancer le classement final
-          </button>
-        )}
+        {/* Texte original */}
+        <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-4">
+          <p className="text-teal-300 text-xs font-bold uppercase tracking-wider mb-2">Texte original</p>
+          <p className="text-white/80 text-sm leading-relaxed italic">&ldquo;{session?.texte_original}&rdquo;</p>
+        </div>
+
+        {/* Valider */}
+        <button
+          onClick={handleValiderCopie}
+          disabled={saving}
+          className="w-full py-4 rounded-2xl bg-gradient-to-r from-teal-400 to-cyan-500 text-slate-900 font-black text-base disabled:opacity-40 hover:scale-105 active:scale-95 transition-all duration-150 shadow-lg"
+        >
+          {saving
+            ? '⏳…'
+            : currentIndex < copies.length - 1
+            ? `✅ Valider — copie suivante (${currentIndex + 2}/${copies.length})`
+            : '🏆 Valider et lancer le classement'}
+        </button>
 
       </div>
-    </main>
-  )
+    </div>
+  );
 }

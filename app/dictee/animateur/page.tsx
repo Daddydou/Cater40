@@ -1,270 +1,307 @@
-'use client'
-// app/dictee/animateur/page.tsx
+'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
-import PlayerAvatar from '@/lib/components/PlayerAvatar'
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { Player, Room } from '@/types';
 
-const ROOM_CODE = 'dictee'
+const TEXTE_DICTEE =
+  "Les orthophonistes travaillent quotidiennement avec des patients qui présentent des troubles du langage. Ils évaluent, diagnostiquent et traitent ces difficultés avec patience et bienveillance. Chaque séance est une opportunité de progresser ensemble vers une meilleure communication.";
 
-const TEXTE_DICTEE = `Les orthophonistes travaillent quotidiennement avec des patients qui présentent des troubles du langage. Ils évaluent, diagnostiquent et traitent ces difficultés avec patience et bienveillance. Chaque séance est une opportunité de progresser ensemble vers une meilleure communication.`
+interface DicteeSession {
+  id: string;
+  room_id: string;
+  texte_original: string;
+  status: 'waiting' | 'writing' | 'uploading' | 'correcting' | 'finished';
+}
 
-type Player = { id: string; name: string; score: number; avatar_url?: string | null }
-type Copy   = { id: string; player_id: string; image_url: string; status: string; players: { name: string } }
+interface DicteeCopy {
+  id: string;
+  session_id: string;
+  player_id: string;
+  image_url: string | null;
+  status: 'pending' | 'uploaded' | 'analyzed' | 'corrected';
+}
 
-export default function DicteeAnimateur() {
-  const [roomId, setRoomId]               = useState<string | null>(null)
-  const [sessionId, setSessionId]         = useState<string | null>(null)
-  const [sessionStatus, setSessionStatus] = useState<string | null>(null)
-  const [players, setPlayers]             = useState<Player[]>([])
-  const [copies, setCopies]               = useState<Copy[]>([])
-  const [loading, setLoading]             = useState(true)
-  const initialized = useRef(false)
+type Phase = 'loading' | 'locked' | 'ready' | 'done';
 
-  const fetchPlayers = useCallback(async (rid: string) => {
-    const { data } = await supabase
-      .from('players').select('id, name, score, avatar_url')
-      .eq('room_id', rid).order('created_at')
-    if (data) setPlayers(data)
-  }, [])
+export default function DicteeAnimateurPage() {
+  const { code } = useParams<{ code: string }>();
+  const router = useRouter();
 
-  const fetchCopies = useCallback(async (sid: string) => {
-    const { data } = await supabase
-      .from('dictee_copies').select('id, player_id, image_url, status, players(name)')
-      .eq('session_id', sid)
-    if (data) setCopies(data as unknown as Copy[])
-  }, [])
-
-  const fetchSession = useCallback(async (rid: string) => {
-    const { data } = await supabase
-      .from('dictee_sessions').select('id, status')
-      .eq('room_id', rid).order('created_at', { ascending: false }).limit(1).single()
-    if (data) {
-      setSessionId(data.id)
-      setSessionStatus(data.status)
-      fetchCopies(data.id)
-    } else {
-      setSessionId(null)
-      setSessionStatus(null)
-      setCopies([])
-    }
-  }, [fetchCopies])
+  const [phase, setPhase] = useState<Phase>('loading');
+  const [room, setRoom] = useState<Room | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [session, setSession] = useState<DicteeSession | null>(null);
+  const [copies, setCopies] = useState<DicteeCopy[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [statusError, setStatusError] = useState('');
 
   useEffect(() => {
-    if (initialized.current) return
-    initialized.current = true
+    supabase.from('rooms').select('*').eq('code', code).single().then(({ data }) => {
+      if (!data) setError('Salle introuvable.');
+      else setRoom(data as Room);
+      setPhase('locked');
+    });
+  }, [code]);
 
-    const init = async () => {
-      const { data: room } = await supabase
-        .from('rooms').select('id').eq('code', ROOM_CODE).single()
-      if (!room) return
-      setRoomId(room.id)
-      await fetchPlayers(room.id)
-      await fetchSession(room.id)
-      setLoading(false)
-
-      supabase.channel(`anim-dictee-players-${room.id}`)
-        .on('postgres_changes', {
-          event: '*', schema: 'public', table: 'players',
-          filter: `room_id=eq.${room.id}`,
-        }, () => fetchPlayers(room.id))
-        .subscribe()
-    }
-    init()
-  }, [fetchPlayers, fetchSession])
-
-  // Écouter les copies quand sessionId change
   useEffect(() => {
-    if (!sessionId) return
-    const ch = supabase.channel(`anim-dictee-copies-${sessionId}`)
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'dictee_copies',
-        filter: `session_id=eq.${sessionId}`,
-      }, () => fetchCopies(sessionId))
-      .subscribe()
-    return () => { supabase.removeChannel(ch) }
-  }, [sessionId, fetchCopies])
+    if (!room) return;
+    supabase
+      .from('players')
+      .select('*')
+      .eq('room_id', room.id)
+      .then(({ data }) => setPlayers((data as Player[]) ?? []));
+  }, [room]);
 
-  // Lancer la dictée — crée la session si elle n'existe pas
-  const handleLancer = async () => {
-    if (!roomId) return
+  const loadCopies = useCallback(async () => {
+    if (!session) return;
+    const { data } = await supabase
+      .from('dictee_copies')
+      .select('*')
+      .eq('session_id', session.id);
+    setCopies((data as DicteeCopy[]) ?? []);
+  }, [session]);
 
-    let sid = sessionId
+  useEffect(() => { loadCopies(); }, [loadCopies]);
 
-    if (!sid) {
-      const { data: newSession } = await supabase
-        .from('dictee_sessions').insert({
-          room_id: roomId,
-          texte_original: TEXTE_DICTEE,
-          status: 'writing',
-        }).select().single()
-      if (!newSession) return
-      sid = newSession.id
-      setSessionId(sid)
-      setSessionStatus('writing')
+  useEffect(() => {
+    if (!room || !session) return;
+
+    const channel = supabase
+      .channel(`dictee-anim-${room.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'dictee_copies', filter: `session_id=eq.${session.id}` },
+        () => loadCopies()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [room, session, loadCopies]);
+
+  const handleEnterAnimateur = async () => {
+    if (!room) return;
+    setPhase('loading');
+
+    const { data: existing, error: fetchErr } = await supabase
+      .from('dictee_sessions')
+      .select('*')
+      .eq('room_id', room.id)
+      .maybeSingle();
+
+    if (fetchErr) {
+      setError('Impossible de charger la session. Vérifiez le schéma SQL.');
+      setPhase('locked');
+      return;
+    }
+
+    let activeSession: DicteeSession;
+
+    if (existing) {
+      activeSession = existing as DicteeSession;
+      setSession(activeSession);
     } else {
-      await supabase.from('dictee_sessions').update({ status: 'writing' }).eq('id', sid)
-      setSessionStatus('writing')
+      const { data: created, error: insertErr } = await supabase
+        .from('dictee_sessions')
+        .insert({ room_id: room.id, texte_original: TEXTE_DICTEE, status: 'waiting' })
+        .select()
+        .single();
+
+      if (insertErr || !created) {
+        setError('Impossible de créer la session. Vérifiez le schéma SQL.');
+        setPhase('locked');
+        return;
+      }
+      activeSession = created as DicteeSession;
+      setSession(activeSession);
     }
 
-    await supabase.from('rooms').update({ status: 'playing' }).eq('id', roomId)
-    if (sid) await fetchCopies(sid)
+    // Charger les copies directement avec la session qu'on vient d'obtenir,
+    // sans attendre le cycle de render du useEffect.
+    const { data: initialCopies } = await supabase
+      .from('dictee_copies')
+      .select('*')
+      .eq('session_id', activeSession.id);
+    setCopies((initialCopies as DicteeCopy[]) ?? []);
+
+    setPhase('ready');
+  };
+
+  const updateSessionStatus = async (status: DicteeSession['status']): Promise<boolean> => {
+    if (!session) return false;
+    setStatusError('');
+    const { error: updateErr } = await supabase
+      .from('dictee_sessions')
+      .update({ status })
+      .eq('id', session.id);
+    if (updateErr) {
+      setStatusError(`Impossible de mettre à jour le statut : ${updateErr.message}`);
+      return false;
+    }
+    setSession(prev => prev ? { ...prev, status } : prev);
+    return true;
+  };
+
+  const handleLancerDictee = async () => {
+    if (!session || saving) return;
+    setSaving(true);
+    await updateSessionStatus('writing');
+    setSaving(false);
+  };
+
+  const handleLancerUpload = async () => {
+    if (!session || saving) return;
+    setSaving(true);
+    await updateSessionStatus('uploading');
+    setSaving(false);
+  };
+
+  const handleLancerCorrection = async () => {
+    if (!session || saving) return;
+    setSaving(true);
+    await updateSessionStatus('correcting');
+    setSaving(false);
+    router.push(`/room/${code}/dictee/correction`);
+  };
+
+  const uploadedCount = copies.filter(c => c.status !== 'pending').length;
+  const sessionStatus = session?.status ?? 'waiting';
+
+  const bg = 'min-h-screen bg-gradient-to-br from-blue-900 via-teal-950 to-green-900 px-4 py-10';
+
+  if (phase === 'loading') {
+    return (
+      <div className={`${bg} flex items-center justify-center`}>
+        <p className="text-white text-lg animate-pulse">Chargement…</p>
+      </div>
+    );
   }
 
-  const handleSetStatus = async (status: string) => {
-    if (!sessionId) return
-    await supabase.from('dictee_sessions').update({ status }).eq('id', sessionId)
-    setSessionStatus(status)
-    if (status === 'correcting') window.location.href = '/dictee/correction'
-    if (status === 'finished' && roomId) {
-      await supabase.from('rooms').update({ status: 'finished' }).eq('id', roomId)
-    }
+  if (error) {
+    return (
+      <div className={`${bg} flex items-center justify-center`}>
+        <p className="text-red-400 text-lg text-center px-4">{error}</p>
+      </div>
+    );
   }
 
-  const handleReset = async () => {
-    if (!confirm('Remettre à zéro ? Tous les joueurs et la session seront supprimés.')) return
-    if (sessionId) {
-      await supabase.from('dictee_copies').delete().eq('session_id', sessionId)
-      await supabase.from('dictee_sessions').delete().eq('id', sessionId)
-    }
-    if (roomId) {
-      await supabase.rpc('reset_room', { p_code: ROOM_CODE })
-    }
-    setPlayers([]); setCopies([])
-    setSessionId(null); setSessionStatus(null)
+  if (phase === 'locked') {
+    return (
+      <div className={`${bg} flex flex-col items-center justify-center gap-6`}>
+        <div className="text-center">
+          <div className="text-6xl mb-4">✍️</div>
+          <h1 className="text-3xl font-extrabold text-white mb-2">La Dictée</h1>
+          <p className="text-teal-300">Interface animateur</p>
+        </div>
+        <button
+          onClick={handleEnterAnimateur}
+          className="px-8 py-4 rounded-2xl bg-gradient-to-r from-teal-400 to-cyan-500 text-slate-900 font-black text-xl hover:scale-105 active:scale-95 transition-all duration-150 shadow-lg"
+        >
+          ✍️ Mode animateur
+        </button>
+      </div>
+    );
   }
-
-  const copiesRecues = copies.filter(c => c.image_url)
-  const gameUrl       = typeof window !== 'undefined' ? `${window.location.origin}/dictee` : ''
-  const correctionUrl = typeof window !== 'undefined' ? `${window.location.origin}/dictee/correction` : ''
-  const classementUrl = typeof window !== 'undefined' ? `${window.location.origin}/dictee/classement` : ''
-
-  if (loading) return (
-    <main className="min-h-screen bg-[#1a1a0f] flex items-center justify-center text-white">
-      <p className="text-white/40">Chargement…</p>
-    </main>
-  )
 
   return (
-    <main className="min-h-screen bg-[#1a1a0f] text-white p-5">
-      <div className="max-w-lg mx-auto space-y-5">
+    <div className={`${bg} flex flex-col items-center`}>
+      <div className="w-full max-w-sm flex flex-col gap-5">
 
         {/* Header */}
-        <div className="flex items-center justify-between pt-2">
+        <div className="text-center">
+          <div className="text-4xl mb-2">✍️</div>
+          <h1 className="text-2xl font-extrabold text-white">Animateur — Dictée</h1>
+          <p className="text-teal-300 text-sm">
+            {players.length} joueur{players.length !== 1 ? 's' : ''} connecté{players.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+
+        {/* Status */}
+        <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-3 flex items-center gap-3">
+          <span className="w-2.5 h-2.5 bg-teal-400 rounded-full animate-pulse flex-shrink-0" />
           <div>
-            <h1 className="text-xl font-bold">📝 La Dictée</h1>
-            <p className="text-white/40 text-sm">Interface animateur</p>
+            <p className="text-white font-semibold text-sm">Statut</p>
+            <p className="text-teal-300 text-xs">
+              {sessionStatus === 'waiting' && '⏳ En attente du lancement'}
+              {sessionStatus === 'writing' && '📝 Dictée en cours'}
+              {sessionStatus === 'uploading' && '📸 Remise des copies'}
+              {sessionStatus === 'correcting' && '✍️ Correction en cours'}
+              {sessionStatus === 'finished' && '✅ Terminé'}
+            </p>
           </div>
-          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-            !sessionStatus             ? 'bg-white/10 text-white/40' :
-            sessionStatus === 'waiting'    ? 'bg-yellow-500/20 text-yellow-300' :
-            sessionStatus === 'writing'    ? 'bg-green-500/20 text-green-300' :
-            sessionStatus === 'uploading'  ? 'bg-blue-500/20 text-blue-300' :
-            sessionStatus === 'correcting' ? 'bg-purple-500/20 text-purple-300' :
-                                             'bg-white/10 text-white/50'
-          }`}>
-            {!sessionStatus             ? '⏳ Prêt' :
-             sessionStatus === 'waiting'    ? '⏳ Attente' :
-             sessionStatus === 'writing'    ? '✍️ Écriture' :
-             sessionStatus === 'uploading'  ? '📸 Upload' :
-             sessionStatus === 'correcting' ? '🔍 Correction' : '✅ Terminé'}
-          </span>
         </div>
 
-        {/* URLs */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-3 space-y-1 text-xs text-white/40">
-          <p>Joueurs → <span className="text-blue-300 font-mono">{gameUrl}</span></p>
-          <p>Correction → <span className="text-blue-300 font-mono">{correctionUrl}</span></p>
-          <p>Classement → <span className="text-blue-300 font-mono">{classementUrl}</span></p>
+        {/* Texte de la dictée */}
+        <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-4">
+          <p className="text-teal-300 text-xs font-bold uppercase tracking-wider mb-2">
+            Texte de la dictée
+          </p>
+          <p className="text-white/80 text-sm leading-relaxed italic">
+            &ldquo;{session?.texte_original ?? TEXTE_DICTEE}&rdquo;
+          </p>
         </div>
 
-	{/* Texte de la dictée à lire */}
-{sessionStatus === 'writing' && (
-  <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-2">
-    <p className="text-amber-300 text-xs uppercase tracking-wide font-semibold">📢 Texte à lire à voix haute</p>
-    <p className="text-base leading-relaxed text-white">{TEXTE_DICTEE}</p>
-  </div>
-)}
-
-        {/* Joueurs */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
-          <div className="flex justify-between items-center">
-            <p className="text-white/40 text-xs uppercase tracking-wide">Joueurs ({players.length})</p>
-            {sessionStatus === 'uploading' && (
-              <p className="text-white/40 text-xs">Copies : {copiesRecues.length}/{players.length}</p>
-            )}
+        {/* Copies counter */}
+        {sessionStatus === 'uploading' && (
+          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-4 text-center">
+            <p className="text-white font-semibold text-lg">
+              📬 {uploadedCount} / {players.length} copies reçues
+            </p>
+            <div className="mt-2 w-full bg-white/10 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-teal-400 to-cyan-500 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${players.length ? (uploadedCount / players.length) * 100 : 0}%` }}
+              />
+            </div>
           </div>
-          {players.length === 0
-            ? <p className="text-white/25 text-sm text-center py-2">Aucun joueur</p>
-            : players.map(p => {
-              const hasCopy = copies.some(c => c.player_id === p.id && c.image_url)
-              return (
-                <div key={p.id} className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={32} />
-                    <span>{p.name}</span>
-                  </div>
-                  {sessionStatus === 'uploading' && (
-                    <span className={`text-xs ${hasCopy ? 'text-green-400' : 'text-white/30'}`}>
-                      {hasCopy ? '📸 Reçue' : '⏳ En attente'}
-                    </span>
-                  )}
-                </div>
-              )
-            })
-          }
-        </div>
+        )}
 
-        {/* Actions */}
-        <div className="space-y-3">
-
-          {/* Pas encore lancé */}
-          {!sessionStatus && (
-            <button onClick={handleLancer} disabled={players.length === 0}
-              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl py-4 disabled:opacity-30 transition-all active:scale-95">
-              ▶️ Lancer la dictée
+        {/* Inline status error */}
+        {statusError && (
+          <div className="bg-red-500/20 border border-red-400/40 rounded-2xl px-4 py-3 text-center">
+            <p className="text-red-300 text-sm">{statusError}</p>
+            <button
+              onClick={() => setStatusError('')}
+              className="text-red-400/70 hover:text-red-300 text-xs mt-1 underline"
+            >
+              Fermer
             </button>
-          )}
+          </div>
+        )}
 
-          {/* En écriture */}
-          {sessionStatus === 'writing' && (
-            <button onClick={() => handleSetStatus('uploading')}
-              className="w-full bg-blue-500 hover:bg-blue-400 text-white font-bold rounded-xl py-4 transition-all active:scale-95">
-              📸 Demander l&apos;upload des copies
-            </button>
-          )}
-
-          {/* Upload */}
-          {sessionStatus === 'uploading' && (
-            <button onClick={() => handleSetStatus('correcting')}
-              className="w-full bg-purple-500 hover:bg-purple-400 text-white font-bold rounded-xl py-4 transition-all active:scale-95">
-              🔍 Lancer la correction IA ({copiesRecues.length}/{players.length} copies)
-            </button>
-          )}
-
-          {/* Correction */}
-          {sessionStatus === 'correcting' && (
-            <a href="/dictee/correction"
-              className="block w-full bg-purple-500 hover:bg-purple-400 text-white font-bold rounded-xl py-4 text-center transition-all active:scale-95">
-              🔍 Ouvrir la correction
-            </a>
-          )}
-
-          {/* Terminé */}
-          {sessionStatus === 'finished' && (
-            <a href="/dictee/classement"
-              className="block w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-4 text-center transition-all active:scale-95">
-              🏆 Voir le classement
-            </a>
-          )}
-
-          <button onClick={handleReset}
-            className="w-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-semibold rounded-xl py-3 transition-all active:scale-95">
-            🔄 Nouvelle partie (reset)
+        {/* Action buttons */}
+        {sessionStatus === 'waiting' && (
+          <button
+            onClick={handleLancerDictee}
+            disabled={saving}
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-teal-400 to-cyan-500 text-slate-900 font-black text-base disabled:opacity-40 hover:scale-105 active:scale-95 transition-all duration-150 shadow-lg"
+          >
+            {saving ? '⏳…' : '▶ Lancer la dictée'}
           </button>
-        </div>
+        )}
 
+        {sessionStatus === 'writing' && (
+          <button
+            onClick={handleLancerUpload}
+            disabled={saving}
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-400 to-amber-500 text-slate-900 font-black text-base disabled:opacity-40 hover:scale-105 active:scale-95 transition-all duration-150 shadow-lg"
+          >
+            {saving ? '⏳…' : '📸 Passer à la remise des copies'}
+          </button>
+        )}
+
+        {sessionStatus === 'uploading' && (
+          <button
+            onClick={handleLancerCorrection}
+            disabled={saving || uploadedCount === 0}
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-black text-base disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 active:scale-95 transition-all duration-150 shadow-lg"
+          >
+            {saving ? '⏳…' : '✍️ Lancer la correction'}
+          </button>
+        )}
       </div>
-    </main>
-  )
+    </div>
+  );
 }
