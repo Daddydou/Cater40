@@ -255,7 +255,7 @@ export default function CorrectionPage() {
                   transform: 'translate(-50%, -50%)',
                 }}
               >
-                <div className="w-4 h-4 rounded-full bg-red-500/40 border-2 border-red-500 shadow-lg" />
+                <div className="w-4 h-4 rounded-full bg-red-500/40 border border-red-500 shadow-lg" />
               </div>
             ))}
           </div>
