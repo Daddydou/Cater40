@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+
+const ROOM_CODE = 'dictee'
 import { Player, Room } from '@/types';
 
 interface DotFaute {
@@ -37,7 +39,7 @@ function getPublicImageUrl(storedUrl: string): string {
 }
 
 export default function CorrectionPage() {
-  const { code } = useParams<{ code: string }>();
+  const code = ROOM_CODE;
   const router = useRouter();
 
   const [room, setRoom] = useState<Room | null>(null);
@@ -136,7 +138,7 @@ export default function CorrectionPage() {
     await supabase.from('dictee_sessions').update({ status: 'finished' }).eq('id', session.id);
     await supabase.from('rooms').update({ current_game: 'dictee:classement:0' }).eq('id', room.id);
 
-    router.push(`/room/${code}/dictee/classement?a=1`);
+    router.push(`/dictee/classement?a=1`);
   }, [room, session, code, router]);
 
   const handleValiderCopie = async () => {
@@ -178,7 +180,7 @@ export default function CorrectionPage() {
     <div className={`${bg} flex flex-col items-center justify-center gap-4`}>
       <p className="text-white text-lg">Aucune copie à corriger.</p>
       <button
-        onClick={() => router.push(`/room/${code}/dictee/classement?a=1`)}
+        onClick={() => router.push(`/dictee/classement?a=1`)}
         className="px-6 py-3 rounded-2xl bg-teal-500 text-white font-bold hover:scale-105 transition-all"
       >
         Aller au classement

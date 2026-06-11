@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Player, Room } from '@/types';
+
+const ROOM_CODE = 'dictee'
 
 const TEXTE_DICTEE =
   "Les orthophonistes travaillent quotidiennement avec des patients qui présentent des troubles du langage. Ils évaluent, diagnostiquent et traitent ces difficultés avec patience et bienveillance. Chaque séance est une opportunité de progresser ensemble vers une meilleure communication.";
@@ -26,7 +28,7 @@ interface DicteeCopy {
 type Phase = 'loading' | 'locked' | 'ready' | 'done';
 
 export default function DicteeAnimateurPage() {
-  const { code } = useParams<{ code: string }>();
+  const code = ROOM_CODE;
   const router = useRouter();
 
   const [phase, setPhase] = useState<Phase>('loading');
@@ -163,7 +165,7 @@ export default function DicteeAnimateurPage() {
     setSaving(true);
     await updateSessionStatus('correcting');
     setSaving(false);
-    router.push(`/room/${code}/dictee/correction`);
+    router.push(`/dictee/correction`);
   };
 
   const uploadedCount = copies.filter(c => c.status !== 'pending').length;
