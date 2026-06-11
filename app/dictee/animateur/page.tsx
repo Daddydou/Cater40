@@ -37,6 +37,8 @@ export default function DicteeAnimateurPage() {
   const [session, setSession] = useState<DicteeSession | null>(null);
   const [copies, setCopies] = useState<DicteeCopy[]>([]);
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const [error, setError] = useState('');
   const [statusError, setStatusError] = useState('');
 
@@ -183,6 +185,25 @@ export default function DicteeAnimateurPage() {
     router.push(`/dictee/correction`);
   };
 
+  const handleReset = async () => {
+    if (!room) return;
+    setResetting(true);
+    setConfirmReset(false);
+
+    if (session) {
+      await supabase.from('dictee_copies').delete().eq('session_id', session.id);
+      await supabase.from('dictee_sessions').delete().eq('id', session.id);
+    }
+    await supabase.from('players').delete().eq('room_id', room.id);
+    await supabase.from('rooms').update({ current_game: null }).eq('id', room.id);
+
+    setSession(null);
+    setCopies([]);
+    setPlayers([]);
+    setResetting(false);
+    setPhase('locked');
+  };
+
   const uploadedCount = copies.filter(c => c.status !== 'pending').length;
   const sessionStatus = session?.status ?? 'waiting';
 
@@ -318,6 +339,39 @@ export default function DicteeAnimateurPage() {
             {saving ? '⏳…' : '✍️ Lancer la correction'}
           </button>
         )}
+
+        {/* Nouvelle partie */}
+        <div className="pt-4 border-t border-white/10">
+          {!confirmReset ? (
+            <button
+              onClick={() => setConfirmReset(true)}
+              disabled={resetting}
+              className="w-full py-3 rounded-2xl border border-red-500/40 text-red-400 text-sm font-semibold hover:bg-red-500/10 transition-colors disabled:opacity-40"
+            >
+              🗑️ Nouvelle partie
+            </button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="text-center text-white/70 text-sm">Effacer tous les joueurs et recommencer ?</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleReset}
+                  disabled={resetting}
+                  className="flex-1 py-3 rounded-2xl bg-red-500 hover:bg-red-400 text-white font-black text-sm disabled:opacity-40 transition-colors"
+                >
+                  {resetting ? '⏳…' : '✅ Confirmer'}
+                </button>
+                <button
+                  onClick={() => setConfirmReset(false)}
+                  className="flex-1 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white/70 text-sm transition-colors"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );
