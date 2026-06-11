@@ -256,6 +256,23 @@ export default function DicteeAnimateurPage() {
           </p>
         </div>
 
+        {/* Liste des joueurs */}
+        {players.length > 0 && (
+          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-4">
+            <p className="text-teal-300 text-xs font-bold uppercase tracking-wider mb-2">
+              Joueurs ({players.length})
+            </p>
+            <ul className="flex flex-col gap-1.5">
+              {players.map(p => (
+                <li key={p.id} className="flex items-center gap-2 text-sm text-white/80">
+                  <span className="w-2 h-2 rounded-full bg-teal-400 flex-shrink-0" />
+                  {p.name}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Status */}
         <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-3 flex items-center gap-3">
           <span className="w-2.5 h-2.5 bg-teal-400 rounded-full animate-pulse flex-shrink-0" />

@@ -13,6 +13,7 @@ export default function Dictee() {
   const [step, setStep]           = useState<'prenom' | 'attente' | 'ecriture' | 'upload' | 'correction' | 'fin'>('prenom')
   const [prenom, setPrenom]       = useState('')
   const [playerId, setPlayerId]   = useState<string | null>(null)
+  const playerIdRef = useRef<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [roomId, setRoomId]       = useState<string | null>(null)
   const [sessionStatus, setSessionStatus] = useState<string>('waiting')
@@ -60,7 +61,7 @@ export default function Dictee() {
 }, [])
 
   const syncStep = (status: string) => {
-    if (!playerId) return;
+    if (!playerIdRef.current) return;
     if (status === 'waiting')    setStep('attente')
     if (status === 'writing')    setStep('ecriture')
     if (status === 'uploading')  setStep('upload')
@@ -82,6 +83,7 @@ export default function Dictee() {
       .select().single()
     if (!player) return
     setPlayerId(player.id)
+    playerIdRef.current = player.id
     if (avatarFile) {
       const url = await uploadAvatar(avatarFile, roomId!, player.id)
       if (url) await supabase.from('players').update({ avatar_url: url }).eq('id', player.id)
