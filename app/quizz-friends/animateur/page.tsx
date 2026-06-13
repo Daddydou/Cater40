@@ -39,15 +39,20 @@ export default function QuizzFriendsAnimateur() {
       setGameState(gsRes.data)
       // Ajouter la question courante aux passées si elle est fermée
       if (gsRes.data.current_question_id && !gsRes.data.question_open) {
-        setPassedIds(prev => [...new Set([...prev, gsRes.data!.current_question_id!])])
+        setPassedIds(prev => prev.includes(gsRes.data!.current_question_id!) ? prev : [...prev, gsRes.data!.current_question_id!])
       }
     }
     if (plRes.data) setPlayers(plRes.data)
     if (anRes.data) {
       setAnswers(anRes.data)
       // Initialiser passedIds depuis les réponses existantes
-      const fromAnswers = [...new Set(anRes.data.map((a: Answer) => a.question_id))]
-      setPassedIds(prev => [...new Set([...prev, ...fromAnswers])])
+      setPassedIds(prev => {
+        const merged = [...prev]
+        for (const a of anRes.data!) {
+          if (!merged.includes(a.question_id)) merged.push(a.question_id)
+        }
+        return merged
+      })
     }
   }, [])
 
@@ -95,7 +100,7 @@ export default function QuizzFriendsAnimateur() {
     await supabase.from('friends_game')
       .update({ question_open: false, updated_at: new Date().toISOString() })
       .eq('room_id', roomId)
-    setPassedIds(prev => [...new Set([...prev, closedId])])
+    setPassedIds(prev => prev.includes(closedId) ? prev : [...prev, closedId])
     await fetchAll(roomId)
   }
 
