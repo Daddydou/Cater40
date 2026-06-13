@@ -10,8 +10,12 @@ create table if not exists friends_game (
   status text not null default 'waiting', -- waiting | playing | finished
   current_question_id int,                -- null = aucune question active
   question_open boolean not null default false,
+  reveal_count int not null default 0,    -- nombre de joueurs révélés dans le classement
   updated_at timestamptz not null default now()
 );
+
+-- Migration pour les tables déjà existantes :
+alter table friends_game add column if not exists reveal_count int not null default 0;
 
 create unique index if not exists friends_game_room_id_unique on friends_game(room_id);
 
