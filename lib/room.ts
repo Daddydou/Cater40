@@ -11,6 +11,7 @@ export const ROOM_CODES = {
   'cater-en-or':       'cater-en-or',
   'photos-gens':       'photos-gens',
   'citations-perdues': 'citations-perdues',
+  'quizz-friends':    'quizz-friends',
 } as const
 
 export type GameSlug = keyof typeof ROOM_CODES

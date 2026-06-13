@@ -12,6 +12,7 @@ const JEUX = [
   { num: 6, nom: 'Une Cater en or',  emoji: '🎯', code: 'cater-en-or',     href: '/cater-en-or/animateur' },
   { num: 7, nom: 'Photos Gens',      emoji: '📸', code: 'photos-gens',     href: '/photos-gens/animateur' },
   { num: 8, nom: 'Citations Perdues',emoji: '💬', code: null,              href: '/citations-perdues' },
+  { num: 9, nom: 'Quizz Friends',   emoji: '🛋️', code: 'quizz-friends',   href: '/quizz-friends/animateur' },
 ] as const
 
 const ROOM_CODES = JEUX.flatMap(j => j.code ? [j.code] : [])
@@ -66,7 +67,7 @@ export default function HubAnimateur() {
   const handleResetAll = async () => {
     if (!confirm('Réinitialiser TOUS les jeux ? Tous les joueurs et scores seront supprimés.')) return
 
-    const codes = ['jeu-bras', 'concours-ortho', 'dictee', 'famille-or', 'cater-en-or', 'photos-gens', 'citations-perdues']
+    const codes = ['jeu-bras', 'concours-ortho', 'dictee', 'famille-or', 'cater-en-or', 'photos-gens', 'citations-perdues', 'quizz-friends']
     await Promise.all(codes.map(code => supabase.rpc('reset_room', { p_code: code })))
 
     await supabase.from('citations_game').delete().neq('id', '00000000-0000-0000-0000-000000000000')
@@ -78,6 +79,8 @@ export default function HubAnimateur() {
     await supabase.from('famille_or_questions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
     await supabase.from('famille_or_reponses').delete().neq('id', '00000000-0000-0000-0000-000000000000')
     await supabase.from('cater_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    await supabase.from('friends_game').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    await supabase.from('friends_answers').delete().neq('id', '00000000-0000-0000-0000-000000000000')
 
     await fetchStatuses()
   }

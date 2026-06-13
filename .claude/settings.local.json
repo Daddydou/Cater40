@@ -30,7 +30,22 @@
       "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\lolor\\\\cater40\\\\app\\\\games\\\\cater-en-or\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\lolor\\\\Cater40\\\\src\\\\app\\\\games\" -Directory)",
       "Bash(Select-Object Name)",
-      "PowerShell(New-Item *)"
+      "PowerShell(New-Item *)",
+      "Bash(npx create-next-app@14 cdm26 --typescript --tailwind --eslint --app --no-src-dir --use-npm --no-git)",
+      "PowerShell(Get-Process *)",
+      "WebFetch(domain:www.fotmob.com)",
+      "WebFetch(domain:www.fifa.com)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:localhost)",
+      "Bash(curl *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\lolor\\\\cdm26\" -Force)",
+      "PowerShell(gh *)",
+      "WebSearch",
+      "WebFetch(domain:worldcuppass.com)",
+      "WebFetch(domain:worldcupstats.football)",
+      "WebFetch(domain:heavy.com)",
+      "WebFetch(domain:www.soccergraph.com)",
+      "PowerShell(git *)"
     ]
   }
 }

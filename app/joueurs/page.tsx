@@ -6,6 +6,7 @@ const JEUX = [
   { num: 3, nom: 'Dictée',          emoji: '📝', desc: 'Dictée corrigée par l\'IA',       href: '/dictee' },
   { num: 4, nom: 'Famille en or',   emoji: '🏆', desc: '100 familles version Cater',      href: '/famille-or' },
   { num: 6, nom: 'Une Cater en or', emoji: '🎯', desc: '2 équipes — tour à tour',          href: '/cater-en-or/joueurs' },
+  { num: 9, nom: 'Quizz Friends',   emoji: '🛋️', desc: 'QCM sur la série Friends',        href: '/quizz-friends' },
 ]
 
 export default function PortailJoueurs() {
