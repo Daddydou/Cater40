@@ -36,7 +36,7 @@ export default function QuizzFriendsAnimateur() {
       supabase.from('friends_answers').select('id, player_id, question_id, is_correct').eq('room_id', rid),
     ])
     if (gsRes.data) {
-      setGameState(gsRes.data)
+      setGameState(gsRes.data as GameState)
       // Ajouter la question courante aux passées si elle est fermée
       if (gsRes.data.current_question_id && !gsRes.data.question_open) {
         setPassedIds(prev => prev.includes(gsRes.data!.current_question_id!) ? prev : [...prev, gsRes.data!.current_question_id!])
@@ -275,7 +275,7 @@ export default function QuizzFriendsAnimateur() {
             )}
 
             {/* Toutes les questions passées */}
-            {allDone && gameState.status !== 'finished' && (
+            {allDone && (
               <button
                 onClick={handleLaunchClassement}
                 className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-4 text-lg transition-all active:scale-95"
