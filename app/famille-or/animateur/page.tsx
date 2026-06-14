@@ -297,10 +297,12 @@ export default function FamilleOrAnimateur() {
   const handleAdverseMoinsBonne = async () => {
     if (!question || !session) return
     const equipeWinner = question.representant_eq1 === question.buzzer_winner_id ? 1 : 2
-    await supabase.from('famille_or_questions').update({
+    console.log('[adverseMoinsBonne] question.id:', question.id, 'equipeWinner:', equipeWinner)
+    const { error } = await supabase.from('famille_or_questions').update({
       phase: 'normal',
       equipe_active: equipeWinner,
     }).eq('id', question.id)
+    console.log('[adverseMoinsBonne] error:', error)
     await fetchActiveQuestion(session.id)
   }
 
