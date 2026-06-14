@@ -83,13 +83,11 @@ export default function FamilleOrAnimateur() {
     const { data: q } = await supabase
       .from('famille_or_questions').select('*')
       .eq('session_id', sessionId).eq('status', 'active').maybeSingle()
-    setQuestion(prev => {
-      if (q && q.buzzer_winner_id && q.buzzer_winner_id !== prevBuzzerId.current) {
-        prevBuzzerId.current = q.buzzer_winner_id
-        playSound('buzz')
-      }
-      return q ?? prev
-    })
+    if (q && q.buzzer_winner_id && q.buzzer_winner_id !== prevBuzzerId.current) {
+      prevBuzzerId.current = q.buzzer_winner_id
+      playSound('buzz')
+    }
+    setQuestion(q)
     if (q) {
       const { data: reps } = await supabase
         .from('famille_or_reponses').select('*')
