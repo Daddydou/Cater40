@@ -154,8 +154,10 @@ export default function FamilleOrAnimateur() {
 
     const interval = setInterval(async () => {
       if (roomIdRef.current) await fetchPlayers(roomIdRef.current)
+      console.log('[polling] sessionIdRef:', sessionIdRef.current)
       if (sessionIdRef.current) {
-        await fetchActiveQuestion(sessionIdRef.current)
+        const q = await fetchActiveQuestion(sessionIdRef.current)
+        console.log('[polling] question:', q?.id, 'buzzer:', q?.buzzer_winner_id, 'phase:', q?.phase)
         await fetchSession(sessionIdRef.current)
       }
     }, 2000)
