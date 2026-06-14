@@ -123,11 +123,9 @@ export default function FamilleOrJoueurs() {
     if (!question || !myPlayer || buzzed) return
     if (question.buzzer_winner_id) return
     setBuzzed(true)
-    // Protection race condition : on écrit uniquement si buzzer_winner_id est encore NULL
     await supabase.from('famille_or_questions')
-      .update({ buzzer_winner_id: myPlayer.id, phase: 'buzzer_ouvert' })
+      .update({ buzzer_winner_id: myPlayer.id })
       .eq('id', question.id)
-      .is('buzzer_winner_id', null)
   }
 
   const isRepresentant = myPlayer && question && (
