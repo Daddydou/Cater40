@@ -290,22 +290,38 @@ export default function FamilleOrAnimateur() {
     await fetchActiveQuestion(session.id)
   }
 
-  // Réponse cliquée pendant phase buzzer : révèle + détermine quelle équipe mène
+  // ── Buzzer : clic sur une réponse ────────────────────────
   const handleBuzzerReponse = async (r: Reponse, currentPhase: string) => {
     if (!question || !session) return
-    await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
-    playSound('ding')
+    const isTopReponse = r.ordre === 1
     if (currentPhase === 'buzzer_ouvert') {
-      const equipe = question.representant_eq1 === question.buzzer_winner_id ? 1 : 2
-      await supabase.from('famille_or_questions').update({ phase: 'normal', equipe_active: equipe }).eq('id', question.id)
-    } else {
+      if (isTopReponse) {
+        const equipe = question.representant_eq1 === question.buzzer_winner_id ? 1 : 2
+        await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
+        playSound('ding')
+        await supabase.from('famille_or_questions').update({ phase: 'normal', equipe_active: equipe }).eq('id', question.id)
+      } else {
+        await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
+        playSound('ding')
+        await supabase.from('famille_or_questions').update({ phase: 'buzzer_adverse' }).eq('id', question.id)
+      }
+    } else if (currentPhase === 'buzzer_adverse') {
       const equipeAdverse = question.representant_eq1 === question.buzzer_winner_id ? 2 : 1
-      await supabase.from('famille_or_questions').update({ phase: 'normal', equipe_active: equipeAdverse }).eq('id', question.id)
+      const equipeWinner = question.representant_eq1 === question.buzzer_winner_id ? 1 : 2
+      const revealedRep = reponses.find(rep => rep.revealed)
+      const adverseBetter = revealedRep ? r.ordre < revealedRep.ordre : false
+      await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
+      playSound('ding')
+      await supabase.from('famille_or_questions').update({
+        phase: 'normal',
+        equipe_active: isTopReponse ? equipeAdverse : (adverseBetter ? equipeAdverse : equipeWinner),
+      }).eq('id', question.id)
     }
     await fetchActiveQuestion(session.id)
+    const { data: reps } = await supabase.from('famille_or_reponses').select('*').eq('question_id', question.id).order('ordre')
+    if (reps) setReponses(reps)
   }
 
-  // "Pas dans le tableau" pendant phase buzzer
   const handleBuzzerCroix = async (currentPhase: string) => {
     if (!question || !session) return
     if (currentPhase === 'buzzer_ouvert') {
