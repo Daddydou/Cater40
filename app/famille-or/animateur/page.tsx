@@ -202,6 +202,7 @@ export default function FamilleOrAnimateur() {
   // ── Lancer le jeu ─────────────────────────────────────────
   const handleLancerJeu = async () => {
     if (!session || !roomId) return
+    sessionIdRef.current = session.id
     await handleSauvegarderEquipes()
     for (const q of defaultQuestions) {
       const { data: newQ } = await supabase.from('famille_or_questions').insert({
