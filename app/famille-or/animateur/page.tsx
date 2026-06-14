@@ -116,16 +116,12 @@ export default function FamilleOrAnimateur() {
   }, [])
 
   useEffect(() => {
-    if (initialized.current) return
-    initialized.current = true
-
-    const init = async () => {
+    const poll = async () => {
       const { data: room } = await supabase
-        .from('rooms').select('id').eq('code', ROOM_CODE).single()
-      if (!room) return
+        .from('rooms').select('id').eq('code', ROOM_CODE).maybeSingle()
+      if (!room) { setLoading(false); return }
       setRoomId(room.id)
       roomIdRef.current = room.id
-      await fetchPlayers(room.id)
 
       const { data: sess } = await supabase
         .from('famille_or_sessions').select('*')
@@ -134,8 +130,8 @@ export default function FamilleOrAnimateur() {
       if (sess) {
         setSession(sess)
         sessionIdRef.current = sess.id
-        setEq1nom(sess.equipe1_nom)
-        setEq2nom(sess.equipe2_nom)
+        setEq1nom(e => e === 'Équipe 1' ? sess.equipe1_nom : e)
+        setEq2nom(e => e === 'Équipe 2' ? sess.equipe2_nom : e)
         if (sess.status === 'equipes') setPhase('equipes')
         else if (sess.status === 'playing') {
           setPhase('jeu')
@@ -146,24 +142,12 @@ export default function FamilleOrAnimateur() {
         }
       }
 
-      supabase.channel(`fo-anim-players-${room.id}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${room.id}` },
-          () => fetchPlayers(room.id))
-        .subscribe()
-
+      await fetchPlayers(room.id)
       setLoading(false)
     }
-    init()
 
-    const interval = setInterval(async () => {
-      if (roomIdRef.current) await fetchPlayers(roomIdRef.current)
-      console.log('[polling] sessionIdRef:', sessionIdRef.current)
-      if (sessionIdRef.current) {
-        const q = await fetchActiveQuestion(sessionIdRef.current)
-        console.log('[polling] question:', q?.id, 'buzzer:', q?.buzzer_winner_id, 'phase:', q?.phase)
-        await fetchSession(sessionIdRef.current)
-      }
-    }, 2000)
+    poll()
+    const interval = setInterval(poll, 2000)
     return () => clearInterval(interval)
   }, [fetchPlayers, fetchActiveQuestion, fetchQuestions, fetchSession])
 
@@ -303,6 +287,33 @@ export default function FamilleOrAnimateur() {
       equipe_active: equipeWinner,
     }).eq('id', question.id)
     console.log('[adverseMoinsBonne] error:', error)
+    await fetchActiveQuestion(session.id)
+  }
+
+  // Réponse cliquée pendant phase buzzer : révèle + détermine quelle équipe mène
+  const handleBuzzerReponse = async (r: Reponse, currentPhase: string) => {
+    if (!question || !session) return
+    await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
+    playSound('ding')
+    if (currentPhase === 'buzzer_ouvert') {
+      const equipe = question.representant_eq1 === question.buzzer_winner_id ? 1 : 2
+      await supabase.from('famille_or_questions').update({ phase: 'normal', equipe_active: equipe }).eq('id', question.id)
+    } else {
+      const equipeAdverse = question.representant_eq1 === question.buzzer_winner_id ? 2 : 1
+      await supabase.from('famille_or_questions').update({ phase: 'normal', equipe_active: equipeAdverse }).eq('id', question.id)
+    }
+    await fetchActiveQuestion(session.id)
+  }
+
+  // "Pas dans le tableau" pendant phase buzzer
+  const handleBuzzerCroix = async (currentPhase: string) => {
+    if (!question || !session) return
+    if (currentPhase === 'buzzer_ouvert') {
+      await supabase.from('famille_or_questions').update({ phase: 'buzzer_adverse' }).eq('id', question.id)
+    } else {
+      const equipeWinner = question.representant_eq1 === question.buzzer_winner_id ? 1 : 2
+      await supabase.from('famille_or_questions').update({ phase: 'normal', equipe_active: equipeWinner }).eq('id', question.id)
+    }
     await fetchActiveQuestion(session.id)
   }
 
@@ -635,49 +646,49 @@ export default function FamilleOrAnimateur() {
               </div>
             </div>
 
-            {/* ── En attente du buzz ── */}
-            {question.phase === 'buzzer_ouvert' && !question.buzzer_winner_id && (
-              <div className="bg-white/5 border border-white/20 rounded-xl p-4 text-center">
-                <p className="text-white/50 text-sm animate-pulse">⏳ En attente du buzz…</p>
+            {/* ── En attente du buzz / buzz reçu / adverse propose ── */}
+            {(question.phase === 'buzzer_ouvert' || question.phase === 'buzzer_adverse') && (
+              <div className={`border rounded-xl p-3 text-center ${
+                question.buzzer_winner_id
+                  ? 'bg-red-500/20 border-red-400'
+                  : 'bg-white/5 border-white/20'
+              }`}>
+                {!question.buzzer_winner_id && (
+                  <p className="text-white/50 text-sm animate-pulse">⏳ En attente du buzz…</p>
+                )}
+                {question.buzzer_winner_id && question.phase === 'buzzer_ouvert' && (
+                  <p className="font-bold text-lg">🔔 {buzzWinnerName} a buzzé ! <span className="text-white/50 text-sm">({buzzWinnerEquipe})</span></p>
+                )}
+                {question.phase === 'buzzer_adverse' && (
+                  <p className="font-bold text-orange-300">⚡ {
+                    question.representant_eq1 === question.buzzer_winner_id
+                      ? getPlayerName(question.representant_eq2)
+                      : getPlayerName(question.representant_eq1)
+                  } propose…</p>
+                )}
               </div>
             )}
 
-            {/* ── Quelqu'un a buzzé ── */}
-            {question.phase === 'buzzer_ouvert' && question.buzzer_winner_id && (
-              <div className="bg-red-500/20 border border-red-400 rounded-xl p-4 space-y-3">
-                <p className="text-center font-bold text-xl">🔔 {buzzWinnerName} a buzzé !</p>
-                <p className="text-center text-white/60 text-sm">({buzzWinnerEquipe})</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={handleTopReponse}
-                    className="bg-green-500 hover:bg-green-400 text-black font-bold rounded-xl py-3 transition-all active:scale-95">
-                    ✅ Top réponse
-                  </button>
-                  <button onClick={handlePasTopReponse}
-                    className="bg-orange-500 hover:bg-orange-400 text-black font-bold rounded-xl py-3 transition-all active:scale-95">
-                    ❌ Pas top
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ── Adverse propose ── */}
-            {question.phase === 'buzzer_adverse' && (
-              <div className="bg-orange-500/20 border border-orange-400 rounded-xl p-4 space-y-3">
-                <p className="text-center font-bold text-orange-300">
-                  ⚡ {question.representant_eq1 === question.buzzer_winner_id
-                    ? getPlayerName(question.representant_eq2)
-                    : getPlayerName(question.representant_eq1)} propose une meilleure réponse…
+            {/* ── Réponses cliquables pendant le buzz ── */}
+            {(question.phase === 'buzzer_ouvert' || question.phase === 'buzzer_adverse') && question.buzzer_winner_id && (
+              <div className="space-y-2">
+                <p className="text-white/40 text-xs uppercase tracking-wide">
+                  {question.phase === 'buzzer_ouvert' ? 'La réponse est-elle dans le tableau ?' : 'La réponse adverse est-elle meilleure ?'}
                 </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={handleAdverseMeilleure}
-                    className="bg-green-500 hover:bg-green-400 text-black font-bold rounded-xl py-3 transition-all active:scale-95">
-                    ✅ Meilleure réponse
+                {reponses.map(r => (
+                  <button key={r.id} onClick={() => handleBuzzerReponse(r, question.phase)}
+                    className="w-full flex items-center justify-between rounded-xl p-3 border bg-[#ffd700]/10 border-[#ffd700]/30 hover:bg-[#ffd700]/30 transition-all active:scale-95">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[#ffd700] font-bold w-5">{r.ordre}</span>
+                      <span className="font-medium text-sm">{r.texte}</span>
+                    </div>
+                    <span className="text-white/50 text-sm">{r.points} pts</span>
                   </button>
-                  <button onClick={handleAdverseMoinsBonne}
-                    className="bg-red-500 hover:bg-red-400 text-white font-bold rounded-xl py-3 transition-all active:scale-95">
-                    ❌ Moins bonne
-                  </button>
-                </div>
+                ))}
+                <button onClick={() => handleBuzzerCroix(question.phase)}
+                  className="w-full bg-red-500/20 hover:bg-red-500/40 border border-red-500/30 text-red-300 font-semibold rounded-xl py-3 transition-all active:scale-95">
+                  ❌ Pas dans le tableau
+                </button>
               </div>
             )}
 
