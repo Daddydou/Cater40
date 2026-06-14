@@ -26,7 +26,10 @@ type Question = {
   equipe_active: number
   croix_equipe1: number
   croix_equipe2: number
-  phase: string // 'normal' | 'vol'
+  phase: string
+  representant_eq1: string | null
+  representant_eq2: string | null
+  buzzer_winner_id: string | null
 }
 type Reponse = {
   id: string
@@ -36,7 +39,7 @@ type Reponse = {
   revealed: boolean
 }
 
-function playSound(type: 'ding' | 'buzzer' | 'fanfare' | 'victoire') {
+function playSound(type: 'ding' | 'buzzer' | 'fanfare' | 'victoire' | 'buzz') {
   try {
     const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
     const osc = ctx.createOscillator()
@@ -46,27 +49,32 @@ function playSound(type: 'ding' | 'buzzer' | 'fanfare' | 'victoire') {
     if (type === 'buzzer')  { osc.frequency.value = 120; osc.type = 'sawtooth'; gain.gain.setValueAtTime(0.4, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4) }
     if (type === 'fanfare') { osc.frequency.value = 660; gain.gain.setValueAtTime(0.3, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6) }
     if (type === 'victoire'){ osc.frequency.value = 523; gain.gain.setValueAtTime(0.3, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1) }
+    if (type === 'buzz')    { osc.frequency.value = 440; osc.type = 'square'; gain.gain.setValueAtTime(0.5, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2) }
     osc.start(); osc.stop(ctx.currentTime + 1)
   } catch {}
 }
 
 export default function FamilleOrAnimateur() {
   const [phase, setPhase] = useState<'inscription' | 'equipes' | 'jeu' | 'fin'>('inscription')
-  const [roomId, setRoomId]       = useState<string | null>(null)
-  const [session, setSession]     = useState<Session | null>(null)
-  const [players, setPlayers]     = useState<Player[]>([])
-  const [questions, setQuestions] = useState<Question[]>([])
-  const [question, setQuestion]   = useState<Question | null>(null)
-  const [reponses, setReponses]   = useState<Reponse[]>([])
-  const [eq1nom, setEq1nom]       = useState('Équipe 1')
-  const [eq2nom, setEq2nom]       = useState('Équipe 2')
-  const [loading, setLoading]     = useState(true)
-  const initialized = useRef(false)
-  const sessionIdRef = useRef<string | null>(null)
+  const [roomId, setRoomId]           = useState<string | null>(null)
+  const [session, setSession]         = useState<Session | null>(null)
+  const [players, setPlayers]         = useState<Player[]>([])
+  const [questions, setQuestions]     = useState<Question[]>([])
+  const [question, setQuestion]       = useState<Question | null>(null)
+  const [reponses, setReponses]       = useState<Reponse[]>([])
+  const [eq1nom, setEq1nom]           = useState('Équipe 1')
+  const [eq2nom, setEq2nom]           = useState('Équipe 2')
+  const [loading, setLoading]         = useState(true)
+  const [pendingRep1, setPendingRep1] = useState<string | null>(null)
+  const [pendingRep2, setPendingRep2] = useState<string | null>(null)
+  const [selectingQ, setSelectingQ]   = useState<Question | null>(null)
+  const initialized   = useRef(false)
+  const sessionIdRef  = useRef<string | null>(null)
+  const prevBuzzerId  = useRef<string | null>(null)
 
   const fetchPlayers = useCallback(async (rid: string) => {
     const { data } = await supabase
-      .from('players').select('id, name, score, avatar_url').eq('room_id', rid).order('created_at')
+      .from('players').select('id, name, score, avatar_url, equipe').eq('room_id', rid).order('created_at')
     if (data) setPlayers(data.map(p => ({ ...p, equipe: (p as { equipe?: number | null }).equipe ?? null })))
   }, [])
 
@@ -74,7 +82,13 @@ export default function FamilleOrAnimateur() {
     const { data: q } = await supabase
       .from('famille_or_questions').select('*')
       .eq('session_id', sessionId).eq('status', 'active').maybeSingle()
-    setQuestion(q)
+    setQuestion(prev => {
+      if (q && q.buzzer_winner_id && q.buzzer_winner_id !== prevBuzzerId.current) {
+        prevBuzzerId.current = q.buzzer_winner_id
+        playSound('buzz')
+      }
+      return q ?? prev
+    })
     if (q) {
       const { data: reps } = await supabase
         .from('famille_or_reponses').select('*')
@@ -110,7 +124,6 @@ export default function FamilleOrAnimateur() {
       setRoomId(room.id)
       await fetchPlayers(room.id)
 
-      // Vérifier si une session existe déjà
       const { data: sess } = await supabase
         .from('famille_or_sessions').select('*')
         .eq('room_id', room.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
@@ -128,16 +141,8 @@ export default function FamilleOrAnimateur() {
         } else if (sess.status === 'finished') {
           setPhase('fin')
         }
-
-        supabase.channel(`fo-anim-${sess.id}`)
-          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'famille_or_sessions', filter: `id=eq.${sess.id}` },
-            () => fetchSession(sess.id))
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'famille_or_questions', filter: `session_id=eq.${sess.id}` },
-            () => { fetchQuestions(sess.id); fetchActiveQuestion(sess.id) })
-          .subscribe()
       }
 
-      // Realtime joueurs
       supabase.channel(`fo-anim-players-${room.id}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${room.id}` },
           () => fetchPlayers(room.id))
@@ -156,7 +161,13 @@ export default function FamilleOrAnimateur() {
     return () => clearInterval(interval)
   }, [fetchPlayers, fetchActiveQuestion, fetchQuestions, fetchSession])
 
-  // ── Étape 1 → 2 : Passer à l'assignation des équipes ─────
+  // ── Helpers ────────────────────────────────────────────────
+  const getPlayerName = (id: string | null) => {
+    if (!id) return '—'
+    return players.find(p => p.id === id)?.name ?? '—'
+  }
+
+  // ── Étape 1 → 2 ───────────────────────────────────────────
   const handlePasserEquipes = async () => {
     if (!roomId) return
     const { data: sess } = await supabase.from('famille_or_sessions').insert({
@@ -171,22 +182,13 @@ export default function FamilleOrAnimateur() {
     setSession(sess)
     sessionIdRef.current = sess.id
     setPhase('equipes')
-
-    supabase.channel(`fo-anim-${sess.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'famille_or_sessions', filter: `id=eq.${sess.id}` },
-        () => fetchSession(sess.id))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'famille_or_questions', filter: `session_id=eq.${sess.id}` },
-        () => { fetchQuestions(sess.id); fetchActiveQuestion(sess.id) })
-      .subscribe()
   }
 
-  // Assigner un joueur à une équipe
   const handleAssignerEquipe = async (playerId: string, equipe: number | null) => {
     await supabase.from('players').update({ equipe } as Record<string, unknown>).eq('id', playerId)
     setPlayers(ps => ps.map(p => p.id === playerId ? { ...p, equipe } : p))
   }
 
-  // Mettre à jour les noms d'équipes
   const handleSauvegarderEquipes = async () => {
     if (!session) return
     await supabase.from('famille_or_sessions').update({
@@ -196,12 +198,10 @@ export default function FamilleOrAnimateur() {
     setSession(s => s ? { ...s, equipe1_nom: eq1nom, equipe2_nom: eq2nom } : s)
   }
 
-  // ── Étape 2 → 3 : Lancer le jeu ──────────────────────────
+  // ── Lancer le jeu ─────────────────────────────────────────
   const handleLancerJeu = async () => {
     if (!session || !roomId) return
     await handleSauvegarderEquipes()
-
-    // Insérer les questions
     for (const q of defaultQuestions) {
       const { data: newQ } = await supabase.from('famille_or_questions').insert({
         session_id: session.id,
@@ -211,7 +211,10 @@ export default function FamilleOrAnimateur() {
         equipe_active: 1,
         croix_equipe1: 0,
         croix_equipe2: 0,
-        phase: 'normal',
+        phase: 'buzzer_ouvert',
+        representant_eq1: null,
+        representant_eq2: null,
+        buzzer_winner_id: null,
       }).select().single()
       if (newQ) {
         await supabase.from('famille_or_reponses').insert(
@@ -219,48 +222,98 @@ export default function FamilleOrAnimateur() {
         )
       }
     }
-
     await supabase.from('famille_or_sessions').update({ status: 'playing' }).eq('id', session.id)
     await supabase.from('rooms').update({ status: 'playing' }).eq('id', roomId)
     await fetchQuestions(session.id)
     setPhase('jeu')
   }
 
-  // Lancer une question avec choix de l'équipe qui commence
-  const handleLancerQuestion = async (q: Question, equipeActive: number) => {
-    if (!session) return
+  // ── Sélection représentants ────────────────────────────────
+  const handleChoisirQuestion = (q: Question) => {
+    setSelectingQ(q)
+    setPendingRep1(null)
+    setPendingRep2(null)
+  }
+
+  const handleLancerQuestion = async () => {
+    if (!session || !selectingQ || !pendingRep1 || !pendingRep2) return
     await supabase.from('famille_or_questions').update({ status: 'closed' })
       .eq('session_id', session.id).eq('status', 'active')
     await supabase.from('famille_or_questions').update({
       status: 'active',
-      equipe_active: equipeActive,
+      equipe_active: 1,
       croix_equipe1: 0,
       croix_equipe2: 0,
-      phase: 'normal',
-    }).eq('id', q.id)
+      phase: 'buzzer_ouvert',
+      representant_eq1: pendingRep1,
+      representant_eq2: pendingRep2,
+      buzzer_winner_id: null,
+    }).eq('id', selectingQ.id)
+    prevBuzzerId.current = null
+    setSelectingQ(null)
     await fetchActiveQuestion(session.id)
     await fetchQuestions(session.id)
   }
 
-  // Révéler une réponse → points à l'équipe active
-const handleReveler = async (r: Reponse) => {
-  if (!question || !session) return
-  await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
-  playSound('ding')
-  const { data: reps } = await supabase
-    .from('famille_or_reponses').select('*')
-    .eq('question_id', question.id).order('ordre')
-  if (reps) setReponses(reps)
-}
+  // ── Actions buzzer ─────────────────────────────────────────
 
-  // Ajouter une croix
+  // Top réponse → équipe du buzzeur prend la main, tour de table classique
+  const handleTopReponse = async () => {
+    if (!question || !session) return
+    const equipe = question.representant_eq1 === question.buzzer_winner_id ? 1 : 2
+    await supabase.from('famille_or_questions').update({
+      phase: 'normal',
+      equipe_active: equipe,
+    }).eq('id', question.id)
+    await fetchActiveQuestion(session.id)
+  }
+
+  // Pas top → l'adverse peut proposer une meilleure réponse
+  const handlePasTopReponse = async () => {
+    if (!question || !session) return
+    await supabase.from('famille_or_questions').update({ phase: 'buzzer_adverse' }).eq('id', question.id)
+    await fetchActiveQuestion(session.id)
+  }
+
+  // Réponse adverse meilleure → son équipe prend la main
+  const handleAdverseMeilleure = async () => {
+    if (!question || !session) return
+    const equipeAdverse = question.representant_eq1 === question.buzzer_winner_id ? 2 : 1
+    await supabase.from('famille_or_questions').update({
+      phase: 'normal',
+      equipe_active: equipeAdverse,
+    }).eq('id', question.id)
+    await fetchActiveQuestion(session.id)
+  }
+
+  // Réponse adverse moins bonne → équipe du buzzeur prend la main
+  const handleAdverseMoinsBonne = async () => {
+    if (!question || !session) return
+    const equipeWinner = question.representant_eq1 === question.buzzer_winner_id ? 1 : 2
+    await supabase.from('famille_or_questions').update({
+      phase: 'normal',
+      equipe_active: equipeWinner,
+    }).eq('id', question.id)
+    await fetchActiveQuestion(session.id)
+  }
+
+  // ── Tour de table ──────────────────────────────────────────
+  const handleReveler = async (r: Reponse) => {
+    if (!question || !session) return
+    await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
+    playSound('ding')
+    const { data: reps } = await supabase
+      .from('famille_or_reponses').select('*')
+      .eq('question_id', question.id).order('ordre')
+    if (reps) setReponses(reps)
+  }
+
   const handleCroix = async () => {
     if (!question || !session) return
     const croixField = question.equipe_active === 1 ? 'croix_equipe1' : 'croix_equipe2'
     const currentCroix = question.equipe_active === 1 ? question.croix_equipe1 : question.croix_equipe2
     const newCroix = currentCroix + 1
     playSound('buzzer')
-
     if (newCroix >= 3) {
       const autreEquipe = question.equipe_active === 1 ? 2 : 1
       await supabase.from('famille_or_questions').update({
@@ -281,7 +334,6 @@ const handleReveler = async (r: Reponse) => {
     for (const r of nonReveleees) {
       await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
     }
-    // B (voleuse) prend uniquement les points déjà révélés (par A + sa propre réponse)
     const pointsRevelees = reponses.filter(r => r.revealed).reduce((sum, r) => sum + r.points, 0)
     const scoreField = question.equipe_active === 1 ? 'equipe1_score' : 'equipe2_score'
     const currentScore = question.equipe_active === 1 ? session.equipe1_score : session.equipe2_score
@@ -298,13 +350,24 @@ const handleReveler = async (r: Reponse) => {
     for (const r of nonReveleees) {
       await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
     }
-    // A (équipe avec 3 croix) prend uniquement ses points déjà révélés avant le vol
     const equipeAvecCroix = question.equipe_active === 1 ? 2 : 1
     const pointsRevelesParA = reponses.filter(r => r.revealed && !nonReveleees.find(n => n.id === r.id)).reduce((sum, r) => sum + r.points, 0)
     const scoreField = equipeAvecCroix === 1 ? 'equipe1_score' : 'equipe2_score'
     const currentScore = equipeAvecCroix === 1 ? session.equipe1_score : session.equipe2_score
     await supabase.from('famille_or_sessions').update({ [scoreField]: currentScore + pointsRevelesParA }).eq('id', session.id)
     await supabase.from('famille_or_questions').update({ status: 'closed', phase: 'normal' }).eq('id', question.id)
+    await fetchActiveQuestion(session.id)
+    await fetchQuestions(session.id)
+    await fetchSession(session.id)
+  }
+
+  const handleValiderPoints = async () => {
+    if (!question || !session) return
+    const total = reponses.reduce((sum, r) => sum + r.points, 0)
+    const scoreField = question.equipe_active === 1 ? 'equipe1_score' : 'equipe2_score'
+    const currentScore = question.equipe_active === 1 ? session.equipe1_score : session.equipe2_score
+    await supabase.from('famille_or_sessions').update({ [scoreField]: currentScore + total }).eq('id', session.id)
+    await supabase.from('famille_or_questions').update({ status: 'closed' }).eq('id', question.id)
     await fetchActiveQuestion(session.id)
     await fetchQuestions(session.id)
     await fetchSession(session.id)
@@ -329,13 +392,22 @@ const handleReveler = async (r: Reponse) => {
     if (roomId) await supabase.rpc('reset_room', { p_code: ROOM_CODE })
     setSession(null); setQuestions([]); setQuestion(null); setReponses([])
     setPlayers([]); setPhase('inscription'); setEq1nom('Équipe 1'); setEq2nom('Équipe 2')
+    setSelectingQ(null); setPendingRep1(null); setPendingRep2(null)
   }
 
   const pendingQuestions = questions.filter(q => q.status === 'pending')
   const croixActives = question
     ? (question.equipe_active === 1 ? question.croix_equipe1 : question.croix_equipe2)
     : 0
+  const eq1Players = players.filter(p => p.equipe === 1)
+  const eq2Players = players.filter(p => p.equipe === 2)
   const gameUrl = typeof window !== 'undefined' ? `${window.location.origin}/famille-or` : ''
+  const buzzWinnerName   = question ? getPlayerName(question.buzzer_winner_id) : '—'
+  const buzzWinnerEquipe = question?.buzzer_winner_id
+    ? (question.representant_eq1 === question.buzzer_winner_id
+        ? (session?.equipe1_nom ?? 'Équipe 1')
+        : (session?.equipe2_nom ?? 'Équipe 2'))
+    : '—'
 
   if (loading) return (
     <main className="min-h-screen bg-[#1a237e] flex items-center justify-center text-white">
@@ -354,12 +426,9 @@ const handleReveler = async (r: Reponse) => {
             <h1 className="text-xl font-bold">🏆 Famille en Or</h1>
             <p className="text-white/40 text-sm">Interface animateur</p>
           </div>
-
           <div className="bg-white/5 border border-white/10 rounded-2xl p-3 text-xs text-white/40">
             <p>Joueurs → <span className="text-blue-300 font-mono">{gameUrl}</span></p>
           </div>
-
-          {/* Noms équipes */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
             <p className="text-white/40 text-xs uppercase tracking-wide">Noms des équipes</p>
             <input value={eq1nom} onChange={e => setEq1nom(e.target.value)}
@@ -369,8 +438,6 @@ const handleReveler = async (r: Reponse) => {
               className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2 outline-none focus:border-yellow-400 text-sm"
               placeholder="Équipe 2" />
           </div>
-
-          {/* Joueurs inscrits */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
             <p className="text-white/40 text-xs uppercase tracking-wide">Joueurs inscrits ({players.length})</p>
             {players.length === 0
@@ -383,12 +450,10 @@ const handleReveler = async (r: Reponse) => {
               ))
             }
           </div>
-
           <button onClick={handlePasserEquipes} disabled={players.length === 0}
             className="w-full bg-[#ffd700] hover:bg-yellow-300 text-black font-bold rounded-xl py-4 disabled:opacity-30 transition-all active:scale-95">
             Assigner les équipes →
           </button>
-
           <button onClick={handleReset}
             className="w-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-semibold rounded-xl py-3 transition-all active:scale-95">
             🔄 Reset
@@ -407,10 +472,7 @@ const handleReveler = async (r: Reponse) => {
         <div className="max-w-lg mx-auto space-y-5">
           <div className="pt-2">
             <h1 className="text-xl font-bold">🏆 Assignation des équipes</h1>
-            <p className="text-white/40 text-sm">Glisse chaque joueur dans son équipe</p>
           </div>
-
-          {/* Noms équipes modifiables */}
           <div className="grid grid-cols-2 gap-3">
             <input value={eq1nom} onChange={e => setEq1nom(e.target.value)}
               className="bg-blue-800 border-2 border-yellow-400 rounded-xl px-3 py-2 text-center font-bold outline-none text-sm"
@@ -419,42 +481,29 @@ const handleReveler = async (r: Reponse) => {
               className="bg-blue-800 border-2 border-white/30 rounded-xl px-3 py-2 text-center font-bold outline-none text-sm"
               placeholder="Équipe 2" />
           </div>
-
-          {/* Joueurs à assigner */}
           <div className="space-y-2">
             {players.map(p => (
               <div key={p.id} className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between gap-3">
                 <span className="font-medium">{p.name}</span>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => handleAssignerEquipe(p.id, 1)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      p.equipe === 1 ? 'bg-yellow-400 text-black' : 'bg-white/10 text-white/60 hover:bg-white/20'
-                    }`}>
+                  <button onClick={() => handleAssignerEquipe(p.id, 1)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${p.equipe === 1 ? 'bg-yellow-400 text-black' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}>
                     {eq1nom}
                   </button>
-                  <button
-                    onClick={() => handleAssignerEquipe(p.id, 2)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      p.equipe === 2 ? 'bg-blue-400 text-white' : 'bg-white/10 text-white/60 hover:bg-white/20'
-                    }`}>
+                  <button onClick={() => handleAssignerEquipe(p.id, 2)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${p.equipe === 2 ? 'bg-blue-400 text-white' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}>
                     {eq2nom}
                   </button>
-                  <button
-                    onClick={() => handleAssignerEquipe(p.id, null)}
-                    className="px-2 py-1.5 rounded-lg text-xs text-white/30 hover:text-white/60 transition-all">
-                    ✕
-                  </button>
+                  <button onClick={() => handleAssignerEquipe(p.id, null)}
+                    className="px-2 py-1.5 rounded-lg text-xs text-white/30 hover:text-white/60 transition-all">✕</button>
                 </div>
               </div>
             ))}
           </div>
-
           <button onClick={handleLancerJeu}
             className="w-full bg-[#ffd700] hover:bg-yellow-300 text-black font-bold rounded-xl py-4 transition-all active:scale-95">
             ▶️ Lancer le jeu !
           </button>
-
           <button onClick={handleReset}
             className="w-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-semibold rounded-xl py-3 transition-all active:scale-95">
             🔄 Reset
@@ -465,7 +514,7 @@ const handleReveler = async (r: Reponse) => {
   }
 
   // ══════════════════════════════════════════════════════════
-  // PHASE 3 — Fin
+  // PHASE FIN
   // ══════════════════════════════════════════════════════════
   if (phase === 'fin') {
     return (
@@ -492,7 +541,7 @@ const handleReveler = async (r: Reponse) => {
   }
 
   // ══════════════════════════════════════════════════════════
-  // PHASE 3 — Jeu en cours
+  // PHASE JEU
   // ══════════════════════════════════════════════════════════
   return (
     <main className="min-h-screen bg-[#1a237e] text-white p-4">
@@ -504,21 +553,126 @@ const handleReveler = async (r: Reponse) => {
             <div className={`rounded-2xl p-3 text-center border-2 ${question?.equipe_active === 1 ? 'border-yellow-400 bg-blue-800' : 'border-white/20 bg-blue-900/50'}`}>
               <p className="text-xs text-white/60">{session.equipe1_nom}</p>
               <p className="text-3xl font-bold text-yellow-300">{session.equipe1_score}</p>
-              <p className="text-xs text-white/40">{players.filter(p => p.equipe === 1).map(p => p.name).join(', ')}</p>
+              <p className="text-xs text-white/40">{eq1Players.map(p => p.name).join(', ')}</p>
             </div>
             <div className={`rounded-2xl p-3 text-center border-2 ${question?.equipe_active === 2 ? 'border-yellow-400 bg-blue-800' : 'border-white/20 bg-blue-900/50'}`}>
               <p className="text-xs text-white/60">{session.equipe2_nom}</p>
               <p className="text-3xl font-bold text-yellow-300">{session.equipe2_score}</p>
-              <p className="text-xs text-white/40">{players.filter(p => p.equipe === 2).map(p => p.name).join(', ')}</p>
+              <p className="text-xs text-white/40">{eq2Players.map(p => p.name).join(', ')}</p>
             </div>
           </div>
         )}
 
-        {/* Question active */}
-        {question ? (
+        {/* ── Sélection représentants ── */}
+        {selectingQ && (
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4">
+            <p className="text-sm font-bold text-yellow-300">Q{selectingQ.ordre} — {selectingQ.question}</p>
+            <p className="text-white/40 text-xs uppercase tracking-wide">Désigner les représentants au buzzer</p>
+
+            <div className="space-y-2">
+              <p className="text-xs text-yellow-300 font-semibold">{session?.equipe1_nom}</p>
+              <div className="flex flex-wrap gap-2">
+                {eq1Players.map(p => (
+                  <button key={p.id} onClick={() => setPendingRep1(p.id)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${pendingRep1 === p.id ? 'bg-yellow-400 text-black' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs text-blue-300 font-semibold">{session?.equipe2_nom}</p>
+              <div className="flex flex-wrap gap-2">
+                {eq2Players.map(p => (
+                  <button key={p.id} onClick={() => setPendingRep2(p.id)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${pendingRep2 === p.id ? 'bg-blue-400 text-white' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={handleLancerQuestion} disabled={!pendingRep1 || !pendingRep2}
+              className="w-full bg-[#ffd700] hover:bg-yellow-300 text-black font-bold rounded-xl py-3 disabled:opacity-30 transition-all active:scale-95">
+              🎯 Ouvrir le buzzer !
+            </button>
+            <button onClick={() => setSelectingQ(null)}
+              className="w-full text-white/30 text-sm py-2 hover:text-white/60 transition-colors">
+              ← Annuler
+            </button>
+          </div>
+        )}
+
+        {/* ── Question active ── */}
+        {question && !selectingQ && (
           <div className="space-y-3">
 
-            {/* Phase vol */}
+            {/* Question */}
+            <div className="bg-blue-800/50 border border-white/10 rounded-2xl p-4">
+              <p className="text-xs text-white/40 mb-1">Q{question.ordre}</p>
+              <p className="text-base font-bold">{question.question}</p>
+            </div>
+
+            {/* Représentants */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-yellow-400/10 border border-yellow-400/30 rounded-xl p-2 text-center">
+                <p className="text-yellow-300/60">Rep. {session?.equipe1_nom}</p>
+                <p className="text-yellow-300 font-bold">{getPlayerName(question.representant_eq1)}</p>
+              </div>
+              <div className="bg-blue-400/10 border border-blue-400/30 rounded-xl p-2 text-center">
+                <p className="text-blue-300/60">Rep. {session?.equipe2_nom}</p>
+                <p className="text-blue-300 font-bold">{getPlayerName(question.representant_eq2)}</p>
+              </div>
+            </div>
+
+            {/* ── En attente du buzz ── */}
+            {question.phase === 'buzzer_ouvert' && !question.buzzer_winner_id && (
+              <div className="bg-white/5 border border-white/20 rounded-xl p-4 text-center">
+                <p className="text-white/50 text-sm animate-pulse">⏳ En attente du buzz…</p>
+              </div>
+            )}
+
+            {/* ── Quelqu'un a buzzé ── */}
+            {question.phase === 'buzzer_ouvert' && question.buzzer_winner_id && (
+              <div className="bg-red-500/20 border border-red-400 rounded-xl p-4 space-y-3">
+                <p className="text-center font-bold text-xl">🔔 {buzzWinnerName} a buzzé !</p>
+                <p className="text-center text-white/60 text-sm">({buzzWinnerEquipe})</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={handleTopReponse}
+                    className="bg-green-500 hover:bg-green-400 text-black font-bold rounded-xl py-3 transition-all active:scale-95">
+                    ✅ Top réponse
+                  </button>
+                  <button onClick={handlePasTopReponse}
+                    className="bg-orange-500 hover:bg-orange-400 text-black font-bold rounded-xl py-3 transition-all active:scale-95">
+                    ❌ Pas top
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Adverse propose ── */}
+            {question.phase === 'buzzer_adverse' && (
+              <div className="bg-orange-500/20 border border-orange-400 rounded-xl p-4 space-y-3">
+                <p className="text-center font-bold text-orange-300">
+                  ⚡ {question.representant_eq1 === question.buzzer_winner_id
+                    ? getPlayerName(question.representant_eq2)
+                    : getPlayerName(question.representant_eq1)} propose une meilleure réponse…
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={handleAdverseMeilleure}
+                    className="bg-green-500 hover:bg-green-400 text-black font-bold rounded-xl py-3 transition-all active:scale-95">
+                    ✅ Meilleure réponse
+                  </button>
+                  <button onClick={handleAdverseMoinsBonne}
+                    className="bg-red-500 hover:bg-red-400 text-white font-bold rounded-xl py-3 transition-all active:scale-95">
+                    ❌ Moins bonne
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Phase vol ── */}
             {question.phase === 'vol' && session && (
               <div className="bg-orange-500/20 border border-orange-400 rounded-xl p-3 text-center space-y-2">
                 <p className="text-orange-300 font-bold">
@@ -537,57 +691,43 @@ const handleReveler = async (r: Reponse) => {
               </div>
             )}
 
-            {/* Question */}
-            <div className="bg-blue-800/50 border border-white/10 rounded-2xl p-4">
-              <p className="text-xs text-white/40 mb-1">Q{question.ordre}</p>
-              <p className="text-base font-bold">{question.question}</p>
-            </div>
-
-            {/* Réponses — toutes visibles animateur */}
-            <div className="space-y-2">
-              {reponses.map(r => (
-                <div key={r.id} className={`flex items-center justify-between rounded-xl p-3 border ${
-                  r.revealed ? 'bg-green-500/10 border-green-500/30' : 'bg-[#ffd700]/10 border-[#ffd700]/30'
-                }`}>
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <span className="text-[#ffd700] font-bold w-5 flex-shrink-0">{r.ordre}</span>
-                    <span className="font-medium text-sm truncate">{r.texte}</span>
+            {/* ── Réponses — toutes visibles animateur ── */}
+            {(question.phase === 'normal' || question.phase === 'vol') && (
+              <div className="space-y-2">
+                {reponses.map(r => (
+                  <div key={r.id} className={`flex items-center justify-between rounded-xl p-3 border ${
+                    r.revealed ? 'bg-green-500/10 border-green-500/30' : 'bg-[#ffd700]/10 border-[#ffd700]/30'
+                  }`}>
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <span className="text-[#ffd700] font-bold w-5 flex-shrink-0">{r.ordre}</span>
+                      <span className="font-medium text-sm truncate">{r.texte}</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-white/50 text-sm">{r.points}</span>
+                      {!r.revealed ? (
+                        <button onClick={() => handleReveler(r)}
+                          className="bg-[#ffd700] hover:bg-yellow-300 text-black text-xs font-bold px-3 py-1.5 rounded-lg transition-all active:scale-95">
+                          Révéler
+                        </button>
+                      ) : (
+                        <span className="text-green-400 text-xs">✓</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-white/50 text-sm">{r.points}</span>
-                    {!r.revealed ? (
-                      <button onClick={() => handleReveler(r)}
-                        className="bg-[#ffd700] hover:bg-yellow-300 text-black text-xs font-bold px-3 py-1.5 rounded-lg transition-all active:scale-95">
-                        Révéler
-                      </button>
-                    ) : (
-                      <span className="text-green-400 text-xs">✓</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
-{/* Toutes les réponses révélées → valider les points */}
-{reponses.length > 0 && reponses.every(r => r.revealed) && question.phase !== 'vol' && (
-  <button onClick={async () => {
-    if (!question || !session) return
-    const total = reponses.reduce((sum, r) => sum + r.points, 0)
-    const scoreField = question.equipe_active === 1 ? 'equipe1_score' : 'equipe2_score'
-    const currentScore = question.equipe_active === 1 ? session.equipe1_score : session.equipe2_score
-    await supabase.from('famille_or_sessions').update({ [scoreField]: currentScore + total }).eq('id', session.id)
-    await supabase.from('famille_or_questions').update({ status: 'closed' }).eq('id', question.id)
-    await fetchActiveQuestion(session.id)
-    await fetchQuestions(session.id)
-    await fetchSession(session.id)
-  }}
-    className="w-full bg-green-500 hover:bg-green-400 text-black font-bold rounded-xl py-3 transition-all active:scale-95">
-    ✅ Valider les points ({reponses.reduce((s, r) => s + r.points, 0)} pts → {question.equipe_active === 1 ? session?.equipe1_nom : session?.equipe2_nom})
-  </button>
-)}
+            {/* Valider tous les points quand tout est révélé */}
+            {question.phase === 'normal' && reponses.length > 0 && reponses.every(r => r.revealed) && (
+              <button onClick={handleValiderPoints}
+                className="w-full bg-green-500 hover:bg-green-400 text-black font-bold rounded-xl py-3 transition-all active:scale-95">
+                ✅ Valider les points ({reponses.reduce((s, r) => s + r.points, 0)} pts → {question.equipe_active === 1 ? session?.equipe1_nom : session?.equipe2_nom})
+              </button>
+            )}
 
             {/* Croix — seulement en phase normale */}
-            {question.phase !== 'vol' && (
+            {question.phase === 'normal' && (
               <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-3">
                 <div className="flex gap-2">
                   {Array.from({ length: 3 }, (_, i) => (
@@ -601,31 +741,20 @@ const handleReveler = async (r: Reponse) => {
               </div>
             )}
           </div>
-        ) : (
-          /* Sélection question suivante */
+        )}
+
+        {/* ── Sélection question suivante ── */}
+        {!question && !selectingQ && (
           <div className="space-y-3">
             <p className="text-white/40 text-xs uppercase tracking-wide">
               {pendingQuestions.length > 0 ? 'Choisir la prochaine question' : 'Toutes les questions jouées'}
             </p>
-
             {pendingQuestions.map(q => (
-              <div key={q.id} className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-2">
-                <p className="text-sm font-medium">Q{q.ordre} — {q.question}</p>
-                {session && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => handleLancerQuestion(q, 1)}
-                      className="bg-yellow-500/20 hover:bg-yellow-500/40 border border-yellow-500/30 text-yellow-300 text-xs font-bold py-2 rounded-lg transition-all active:scale-95">
-                      {session.equipe1_nom} commence
-                    </button>
-                    <button onClick={() => handleLancerQuestion(q, 2)}
-                      className="bg-blue-500/20 hover:bg-blue-500/40 border border-blue-500/30 text-blue-300 text-xs font-bold py-2 rounded-lg transition-all active:scale-95">
-                      {session.equipe2_nom} commence
-                    </button>
-                  </div>
-                )}
-              </div>
+              <button key={q.id} onClick={() => handleChoisirQuestion(q)}
+                className="w-full bg-white/5 border border-white/10 hover:border-yellow-400/50 rounded-xl p-3 text-left text-sm font-medium transition-all active:scale-95">
+                Q{q.ordre} — {q.question}
+              </button>
             ))}
-
             {pendingQuestions.length === 0 && (
               <button onClick={handleTerminer}
                 className="w-full bg-[#ffd700] hover:bg-yellow-300 text-black font-bold rounded-xl py-4 transition-all active:scale-95">
@@ -635,9 +764,9 @@ const handleReveler = async (r: Reponse) => {
           </div>
         )}
 
-        {/* Bouton terminer + reset */}
+        {/* Boutons bas de page */}
         <div className="space-y-2 pt-1">
-          {pendingQuestions.length > 0 && (
+          {pendingQuestions.length > 0 && !selectingQ && (
             <button onClick={handleTerminer}
               className="w-full bg-white/10 hover:bg-white/20 border border-white/20 font-semibold rounded-xl py-3 transition-all active:scale-95">
               🏁 Terminer le jeu maintenant

@@ -1,5 +1,5 @@
 'use client'
-// app/famille-or/page.tsx — Écran joueurs/spectateurs
+// app/famille-or/page.tsx — Écran joueurs/spectateurs avec buzzer
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -25,6 +25,9 @@ type Question = {
   croix_equipe1: number
   croix_equipe2: number
   phase: string
+  representant_eq1: string | null
+  representant_eq2: string | null
+  buzzer_winner_id: string | null
 }
 type Reponse = {
   id: string
@@ -33,16 +36,24 @@ type Reponse = {
   points: number
   revealed: boolean
 }
+type Player = {
+  id: string
+  name: string
+  equipe: number | null
+  avatar_url?: string | null
+}
 
-export default function FamilleOrSpectateurs() {
-  const [prenom, setPrenom]     = useState('')
-  const [roomId, setRoomId]     = useState<string | null>(null)
-  const [session, setSession]   = useState<Session | null>(null)
-  const [question, setQuestion] = useState<Question | null>(null)
-  const [reponses, setReponses] = useState<Reponse[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [joined, setJoined]     = useState(false)
-  const [avatarFile, setAvatarFile]       = useState<File | null>(null)
+export default function FamilleOrJoueurs() {
+  const [prenom, setPrenom]         = useState('')
+  const [myPlayer, setMyPlayer]     = useState<Player | null>(null)
+  const [roomId, setRoomId]         = useState<string | null>(null)
+  const [session, setSession]       = useState<Session | null>(null)
+  const [question, setQuestion]     = useState<Question | null>(null)
+  const [reponses, setReponses]     = useState<Reponse[]>([])
+  const [loading, setLoading]       = useState(true)
+  const [joined, setJoined]         = useState(false)
+  const [buzzed, setBuzzed]         = useState(false)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
 
@@ -78,8 +89,11 @@ export default function FamilleOrSpectateurs() {
             .from('famille_or_reponses').select('*')
             .eq('question_id', q.id).order('ordre')
           if (reps) setReponses(reps)
+          // Reset buzzed si nouvelle question sans buzz
+          if (!q.buzzer_winner_id) setBuzzed(false)
         } else {
           setReponses([])
+          setBuzzed(false)
         }
       }
       setLoading(false)
@@ -100,14 +114,37 @@ export default function FamilleOrSpectateurs() {
         const url = await uploadAvatar(avatarFile, roomId!, data.id)
         if (url) await supabase.from('players').update({ avatar_url: url }).eq('id', data.id)
       }
+      setMyPlayer({ id: data.id, name: prenom.trim(), equipe: null })
       setJoined(true)
     }
   }
 
-  const croixEq1 = question?.croix_equipe1 ?? 0
-  const croixEq2 = question?.croix_equipe2 ?? 0
+  const handleBuzz = async () => {
+    if (!question || !myPlayer || buzzed) return
+    if (question.buzzer_winner_id) return
+    setBuzzed(true)
+    // Protection race condition : on écrit uniquement si buzzer_winner_id est encore NULL
+    await supabase.from('famille_or_questions')
+      .update({ buzzer_winner_id: myPlayer.id, phase: 'buzzer_ouvert' })
+      .eq('id', question.id)
+      .is('buzzer_winner_id', null)
+  }
+
+  const isRepresentant = myPlayer && question && (
+    question.representant_eq1 === myPlayer.id ||
+    question.representant_eq2 === myPlayer.id
+  )
+
+  const isBuzzWinner = myPlayer && question?.buzzer_winner_id === myPlayer.id
+
+  const isAdverse = myPlayer && question &&
+    question.phase === 'buzzer_adverse' &&
+    question.buzzer_winner_id &&
+    question.buzzer_winner_id !== myPlayer.id &&
+    (question.representant_eq1 === myPlayer.id || question.representant_eq2 === myPlayer.id)
+
   const croixActives = question
-    ? (question.equipe_active === 1 ? croixEq1 : croixEq2)
+    ? (question.equipe_active === 1 ? question.croix_equipe1 : question.croix_equipe2)
     : 0
 
   if (loading) return (
@@ -116,7 +153,7 @@ export default function FamilleOrSpectateurs() {
     </main>
   )
 
-  // ── Saisie prénom ─────────────────────────────────────────
+  // ── Saisie prénom ──────────────────────────────────────────
   if (!joined) {
     return (
       <main className="min-h-screen bg-[#1a237e] flex flex-col items-center justify-center p-6 text-white">
@@ -132,7 +169,6 @@ export default function FamilleOrSpectateurs() {
             className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-center text-lg outline-none focus:border-yellow-400 transition-colors"
             autoFocus
           />
-          {/* Avatar optionnel */}
           <div className="flex flex-col items-center gap-3">
             <div onClick={() => avatarRef.current?.click()} className="cursor-pointer">
               <PlayerAvatar name={prenom || '?'} avatarUrl={avatarPreview} size={72} />
@@ -152,7 +188,7 @@ export default function FamilleOrSpectateurs() {
     )
   }
 
-  // ── Fin ───────────────────────────────────────────────────
+  // ── Fin ────────────────────────────────────────────────────
   if (session?.status === 'finished') {
     const eq1Wins = (session.equipe1_score ?? 0) > (session.equipe2_score ?? 0)
     const eq2Wins = (session.equipe2_score ?? 0) > (session.equipe1_score ?? 0)
@@ -177,7 +213,7 @@ export default function FamilleOrSpectateurs() {
     )
   }
 
-  // ── Attente lancement ─────────────────────────────────────
+  // ── Attente lancement ──────────────────────────────────────
   if (!session || session.status === 'equipes') {
     return (
       <main className="min-h-screen bg-[#1a237e] flex flex-col items-center justify-center p-6 text-white text-center">
@@ -188,12 +224,12 @@ export default function FamilleOrSpectateurs() {
     )
   }
 
-  // ── Jeu en cours ─────────────────────────────────────────
+  // ── Jeu en cours ───────────────────────────────────────────
   return (
     <main className="min-h-screen bg-[#1a237e] text-white p-4 flex flex-col">
       <div className="max-w-lg mx-auto w-full space-y-4 flex-1">
 
-        {/* Scores équipes */}
+        {/* Scores */}
         <div className="grid grid-cols-2 gap-3 pt-2">
           <div className={`rounded-2xl p-3 text-center border-2 ${
             question?.equipe_active === 1 ? 'border-yellow-400 bg-blue-800' : 'border-white/20 bg-blue-900/50'
@@ -226,8 +262,52 @@ export default function FamilleOrSpectateurs() {
           }
         </div>
 
-        {/* Réponses masquées/révélées */}
-        {reponses.length > 0 && (
+        {/* ── Phase buzzer ouvert ── */}
+        {question?.phase === 'buzzer_ouvert' && (
+          <div className="flex flex-col items-center gap-3">
+            {isRepresentant ? (
+              <>
+                {!question.buzzer_winner_id ? (
+                  <button
+                    onClick={handleBuzz}
+                    disabled={!!buzzed}
+                    className="w-48 h-48 rounded-full bg-red-600 hover:bg-red-500 active:scale-95 disabled:opacity-40 text-white font-black text-4xl shadow-2xl transition-all border-8 border-red-400"
+                  >
+                    BUZZ !
+                  </button>
+                ) : isBuzzWinner ? (
+                  <div className="text-center space-y-2">
+                    <div className="text-5xl">🎯</div>
+                    <p className="text-yellow-300 font-bold text-xl">Tu as buzzé !</p>
+                    <p className="text-white/60 text-sm">Donne ta réponse à voix haute</p>
+                  </div>
+                ) : (
+                  <div className="text-center text-white/40 py-4">
+                    <p>L&apos;autre représentant a buzzé en premier</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center space-y-2 py-4">
+                <div className="w-32 h-32 rounded-full bg-white/5 border-4 border-white/10 flex items-center justify-center mx-auto">
+                  <span className="text-white/20 font-bold text-xl">BUZZ</span>
+                </div>
+                <p className="text-white/30 text-sm">Les représentants buzzent…</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Phase adverse ── */}
+        {isAdverse && (
+          <div className="bg-orange-500/20 border border-orange-400 rounded-xl p-4 text-center space-y-2">
+            <p className="text-orange-300 font-bold text-lg">⚡ À toi de proposer !</p>
+            <p className="text-white/60 text-sm">Donne ta réponse à voix haute</p>
+          </div>
+        )}
+
+        {/* Réponses révélées — seulement en phase normale ou vol */}
+        {reponses.length > 0 && (question?.phase === 'normal' || question?.phase === 'vol') && (
           <div className="space-y-2">
             {reponses.map(r => (
               <div key={r.id} className="fo-card-wrap h-14">
@@ -248,8 +328,8 @@ export default function FamilleOrSpectateurs() {
           </div>
         )}
 
-        {/* Croix */}
-        {question && (
+        {/* Croix — seulement en phase normale ou vol */}
+        {question && (question.phase === 'normal' || question.phase === 'vol') && (
           <div className="flex justify-center gap-4 pt-1">
             {Array.from({ length: 3 }, (_, i) => (
               <span key={i} className={`text-3xl transition-all ${i < croixActives ? 'opacity-100 scale-110' : 'opacity-15'}`}>
