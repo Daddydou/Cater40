@@ -10,6 +10,7 @@ const JEUX = [
   { slug: 'cater-en-or',       num: 6, nom: 'Une Cater en or',   emoji: '🎯', desc: '2 équipes — tour à tour' },
   { slug: 'photos-gens',       num: 7, nom: 'Photos Gens',       emoji: '📸', desc: 'À qui appartient cette photo ?' },
   { slug: 'citations-perdues', num: 8, nom: 'Citations Perdues', emoji: '💬', desc: 'Le pendu des citations' },
+  { slug: 'quizz-friends',     num: 9, nom: 'Quizz Friends',     emoji: '🛋️', desc: 'QCM pour experts de Friends' },
 ]
 
 export default function Home() {
