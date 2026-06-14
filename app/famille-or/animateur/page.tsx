@@ -74,9 +74,12 @@ export default function FamilleOrAnimateur() {
   const prevBuzzerId  = useRef<string | null>(null)
 
   const fetchPlayers = useCallback(async (rid: string) => {
-    const { data } = await supabase
-      .from('players').select('id, name, score, avatar_url, equipe').eq('room_id', rid).order('created_at')
-    if (data) setPlayers(data.map(p => ({ ...p, equipe: (p as { equipe?: number | null }).equipe ?? null })))
+    try {
+      const { data, error } = await supabase
+        .from('players').select('id, name, score, avatar_url, equipe').eq('room_id', rid).order('created_at')
+      if (error) { console.error('[fetchPlayers] error:', error); return }
+      if (data) setPlayers(data.map(p => ({ ...p, equipe: (p as { equipe?: number | null }).equipe ?? null })))
+    } catch(e) { console.error('[fetchPlayers] exception:', e) }
   }, [])
 
   const fetchActiveQuestion = useCallback(async (sessionId: string) => {
