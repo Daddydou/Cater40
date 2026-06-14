@@ -70,6 +70,7 @@ export default function FamilleOrAnimateur() {
   const [selectingQ, setSelectingQ]   = useState<Question | null>(null)
   const initialized   = useRef(false)
   const sessionIdRef  = useRef<string | null>(null)
+  const roomIdRef     = useRef<string | null>(null)
   const prevBuzzerId  = useRef<string | null>(null)
 
   const fetchPlayers = useCallback(async (rid: string) => {
@@ -122,6 +123,7 @@ export default function FamilleOrAnimateur() {
         .from('rooms').select('id').eq('code', ROOM_CODE).single()
       if (!room) return
       setRoomId(room.id)
+      roomIdRef.current = room.id
       await fetchPlayers(room.id)
 
       const { data: sess } = await supabase
@@ -153,6 +155,7 @@ export default function FamilleOrAnimateur() {
     init()
 
     const interval = setInterval(async () => {
+      if (roomIdRef.current) await fetchPlayers(roomIdRef.current)
       if (sessionIdRef.current) {
         await fetchActiveQuestion(sessionIdRef.current)
         await fetchSession(sessionIdRef.current)
