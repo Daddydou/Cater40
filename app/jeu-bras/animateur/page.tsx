@@ -353,7 +353,7 @@ export default function JeuBrasAnimateur() {
           {/* Reset discret */}
           <button
             onClick={handleReset}
-            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/30 hover:text-white/50 text-xs font-medium rounded-xl py-2 transition-all active:scale-95"
+            className="w-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-300 text-sm font-medium rounded-xl py-2 transition-all active:scale-95"
           >
             🔄 Nouvelle partie
           </button>
@@ -393,9 +393,9 @@ export default function JeuBrasAnimateur() {
         )}
         <button
           onClick={handleReset}
-          className="w-full max-w-md bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-semibold rounded-2xl py-4 transition-all active:scale-95"
+          className="w-full max-w-md bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-300 text-sm font-medium rounded-xl py-3 transition-all active:scale-95"
         >
-          🔄 Nouvelle partie (reset complet)
+          🔄 Nouvelle partie
         </button>
       </main>
     )

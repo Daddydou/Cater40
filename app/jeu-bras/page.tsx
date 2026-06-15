@@ -61,11 +61,20 @@ export default function JeuBrasCater() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [finalScore, setFinalScore] = useState<number | null>(null)
   const roomRef = useRef<{ id: string } | null>(null)
+  const uiStateRef = useRef<UIState>('loading')
+
+  const ACTIVE_STATES: UIState[] = ['playing', 'feedback-bon', 'feedback-faux', 'finished']
 
   const applyGameState = useCallback((currentGame: string | null) => {
-    const { uiState, index } = parseGameState(currentGame)
-    setUiState(uiState)
+    const { uiState: newState, index } = parseGameState(currentGame)
+    if (newState === 'waiting' && ACTIVE_STATES.includes(uiStateRef.current)) {
+      window.location.reload()
+      return
+    }
+    uiStateRef.current = newState
+    setUiState(newState)
     setCurrentIndex(index)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const pollRoom = useCallback(async () => {
