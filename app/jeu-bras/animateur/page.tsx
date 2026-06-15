@@ -214,7 +214,9 @@ export default function JeuBrasAnimateur() {
   const handleReset = async () => {
     if (!roomRef.current) return
     if (!confirm('Remettre à zéro ? Tous les joueurs et scores seront supprimés.')) return
-    await supabase.rpc('reset_room', { p_code: roomRef.current.code })
+    const { id: roomId, code } = roomRef.current
+    await supabase.rpc('reset_room', { p_code: code })
+    await supabase.from('rooms').update({ current_game: null }).eq('id', roomId)
     window.location.reload()
   }
 

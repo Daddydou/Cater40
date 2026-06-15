@@ -186,7 +186,7 @@ export default function JeuBrasCater() {
           <img
             src={`${BUCKET_URL}/${currentPhoto}`}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover opacity-20"
+            className="absolute inset-0 w-full h-full object-contain opacity-20"
           />
         )}
         <div className="fixed inset-0 flex items-center justify-center bg-black/60">
@@ -219,21 +219,21 @@ export default function JeuBrasCater() {
   // ── Playing ────────────────────────────────────────────────────
   if (uiState === 'playing') {
     return (
-      <main className={`${nunito.className} min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center px-4`}>
-        <div className="w-full max-w-md mx-auto flex flex-col gap-5">
-          <p className="text-[#FFD700] text-center font-bold text-xl">
+      <main className={`${nunito.className} h-screen bg-[#0a0a0a] flex flex-col px-4 py-4`}>
+        <div className="w-full max-w-md mx-auto flex flex-col flex-1 gap-4">
+          <p className="text-[#FFD700] text-center font-bold text-xl shrink-0">
             Photo {currentIndex + 1} / {photos.length}
           </p>
           {currentPhoto && (
-            <div className="rounded-3xl overflow-hidden aspect-square w-full bg-white/5 shadow-2xl">
+            <div className="flex-1 w-full bg-black rounded-3xl overflow-hidden">
               <img
                 src={`${BUCKET_URL}/${currentPhoto}`}
                 alt={`Bras ${currentIndex + 1}`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
             </div>
           )}
-          <p className="text-white/30 text-center text-sm tracking-wide">
+          <p className="text-white/30 text-center text-sm tracking-wide shrink-0">
             À qui appartient ce bras ?
           </p>
         </div>
