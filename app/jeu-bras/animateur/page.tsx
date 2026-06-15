@@ -349,6 +349,14 @@ export default function JeuBrasAnimateur() {
               <span className="text-base font-semibold">Bon</span>
             </button>
           </div>
+
+          {/* Reset discret */}
+          <button
+            onClick={handleReset}
+            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/30 hover:text-white/50 text-xs font-medium rounded-xl py-2 transition-all active:scale-95"
+          >
+            🔄 Nouvelle partie
+          </button>
         </div>
 
         <style>{`
