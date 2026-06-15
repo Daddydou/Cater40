@@ -62,18 +62,19 @@ export default function Dictee() {
     return () => clearInterval(interval)
   }, [])
 
-  // Fetch score quand finished
+  // Poll score toutes les 2s au step 'fin'
   useEffect(() => {
-    if (step !== 'fin' || !playerIdRef.current) return
-    const fetchScore = async () => {
+    if (step !== 'fin') return
+    const interval = setInterval(async () => {
+      if (!playerIdRef.current) return
       const { data } = await supabase
         .from('players')
         .select('score')
-        .eq('id', playerIdRef.current!)
+        .eq('id', playerIdRef.current)
         .maybeSingle()
       if (data !== null) setMyScore(data.score)
-    }
-    fetchScore()
+    }, 2000)
+    return () => clearInterval(interval)
   }, [step])
 
   const handleJoin = async () => {

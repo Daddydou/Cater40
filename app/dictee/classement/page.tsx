@@ -20,6 +20,7 @@ function ClassementContent() {
   const [showConfetti, setShowConfetti]   = useState(false)
   const [showMessage, setShowMessage]     = useState(false)
   const [loading, setLoading]             = useState(true)
+  const [roomId, setRoomId]               = useState<string | null>(null)
   const roomIdRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -31,24 +32,38 @@ function ClassementContent() {
         .maybeSingle()
       if (!room) { setLoading(false); return }
       roomIdRef.current = room.id
+      setRoomId(room.id)
 
       const { data } = await supabase
         .from('players')
         .select('id, name, score, avatar_url')
         .eq('room_id', room.id)
         .order('score', { ascending: true })
-      if (data) setPlayers(data)
+      if (data) {
+        setPlayers(data)
+        if (!isAnimateur) setRevealedCount(data.length)
+      }
       setLoading(false)
     }
     load()
-  }, [])
+  }, [isAnimateur])
 
-  // Spectateur : tout révéler immédiatement
+  // Spectateur : polling toutes les 2s
   useEffect(() => {
-    if (!loading && !isAnimateur && players.length > 0) {
-      setRevealedCount(players.length)
-    }
-  }, [loading, isAnimateur, players.length])
+    if (isAnimateur || !roomId) return
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from('players')
+        .select('id, name, score, avatar_url')
+        .eq('room_id', roomId)
+        .order('score', { ascending: true })
+      if (data) {
+        setPlayers(data)
+        setRevealedCount(data.length)
+      }
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [isAnimateur, roomId])
 
   const handleNext = () => {
     const next = revealedCount + 1

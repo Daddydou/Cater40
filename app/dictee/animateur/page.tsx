@@ -125,21 +125,12 @@ export default function DicteeAnimateur() {
   }
 
   const handleReset = async () => {
-    if (!roomRef.current || !confirm('Remettre à zéro ? Tous les joueurs seront supprimés.')) return
+    if (!confirm('Remettre à zéro ? Tous les joueurs seront supprimés.')) return
     if (sessionIdRef.current) {
       await supabase.from('dictee_sessions').delete().eq('id', sessionIdRef.current)
     }
-    await supabase.from('players').delete().eq('room_id', roomRef.current.id)
-    sessionIdRef.current = null
-    const { data: created } = await supabase
-      .from('dictee_sessions')
-      .insert({ room_id: roomRef.current.id, texte_original: TEXTE_DICTEE, status: 'waiting' })
-      .select('id')
-      .maybeSingle()
-    if (created) sessionIdRef.current = created.id
-    setPlayers([])
-    setScores({})
-    setPhase('ready')
+    await supabase.rpc('reset_room', { p_code: ROOM_CODE })
+    window.location.reload()
   }
 
   const allScoresFilled =
@@ -198,7 +189,7 @@ export default function DicteeAnimateur() {
             onClick={handleReset}
             className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/30 hover:text-white/50 text-sm rounded-xl py-2 transition-all"
           >
-            🔄 Réinitialiser
+            🗑️ Nouvelle partie
           </button>
         </div>
       </main>
@@ -226,6 +217,13 @@ export default function DicteeAnimateur() {
             className="w-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold rounded-2xl py-4 disabled:opacity-40 transition-all active:scale-95"
           >
             {saving ? '⏳…' : '✏️ Lancer la correction'}
+          </button>
+
+          <button
+            onClick={handleReset}
+            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/30 hover:text-white/50 text-sm rounded-xl py-2 transition-all"
+          >
+            🗑️ Nouvelle partie
           </button>
         </div>
       </main>
@@ -258,6 +256,13 @@ export default function DicteeAnimateur() {
             className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-2xl py-4 text-lg disabled:opacity-30 transition-all active:scale-95"
           >
             {saving ? '⏳…' : '🔢 Passer aux notes'}
+          </button>
+
+          <button
+            onClick={handleReset}
+            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/30 hover:text-white/50 text-sm rounded-xl py-2 transition-all"
+          >
+            🗑️ Nouvelle partie
           </button>
         </div>
       </main>
@@ -306,6 +311,13 @@ export default function DicteeAnimateur() {
               Toutes les notes doivent être remplies
             </p>
           )}
+
+          <button
+            onClick={handleReset}
+            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/30 hover:text-white/50 text-sm rounded-xl py-2 transition-all"
+          >
+            🗑️ Nouvelle partie
+          </button>
         </div>
       </main>
     )
@@ -321,9 +333,9 @@ export default function DicteeAnimateur() {
       </a>
       <button
         onClick={handleReset}
-        className="mt-4 text-white/20 hover:text-white/50 text-sm underline transition-colors"
+        className="w-full max-w-sm bg-white/5 hover:bg-white/10 border border-white/10 text-white/30 hover:text-white/50 text-sm rounded-xl py-2 transition-all mt-2"
       >
-        Nouvelle partie
+        🗑️ Nouvelle partie
       </button>
     </main>
   )
