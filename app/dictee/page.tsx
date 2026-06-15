@@ -2,54 +2,43 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import PlayerAvatar from '@/lib/components/PlayerAvatar'
-import { uploadAvatar } from '@/lib/hooks/useAvatarUpload'
 
 const ROOM_CODE = 'dictee'
 
-type Step = 'prenom' | 'attente' | 'ecriture' | 'correction' | 'fin'
+type Step = 'prenom' | 'attente' | 'ecriture' | 'correction' | 'notes' | 'fin'
+
+const STATUS_TO_STEP: Record<string, Step> = {
+  waiting:    'attente',
+  writing:    'ecriture',
+  correcting: 'correction',
+  scoring:    'notes',
+  finished:   'fin',
+}
 
 export default function Dictee() {
-  const [step, setStep]             = useState<Step>('prenom')
-  const [prenom, setPrenom]         = useState('')
-  const [myScore, setMyScore]       = useState<number | null>(null)
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  const avatarRef    = useRef<HTMLInputElement>(null)
+  const [step, setStep]   = useState<Step>('prenom')
+  const [prenom, setPrenom] = useState('')
+  const [myScore, setMyScore] = useState<number | null>(null)
   const playerIdRef  = useRef<string | null>(null)
   const roomIdRef    = useRef<string | null>(null)
   const sessionIdRef = useRef<string | null>(null)
   const stepRef      = useRef<Step>('prenom')
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setAvatarFile(file)
-    setAvatarPreview(URL.createObjectURL(file))
-  }
-
   const applyStatus = (status: string) => {
     if (!playerIdRef.current) return
-    const map: Record<string, Step> = {
-      waiting:    'attente',
-      writing:    'ecriture',
-      correcting: 'correction',
-      finished:   'fin',
-    }
-    const next = map[status]
+    const next = STATUS_TO_STEP[status]
     if (next && next !== stepRef.current) {
       stepRef.current = next
       setStep(next)
     }
   }
 
-  // Polling — démarre après inscription (roomIdRef set)
+  // Polling démarré après inscription
   useEffect(() => {
     const interval = setInterval(async () => {
       if (!roomIdRef.current || !playerIdRef.current) return
 
       if (!sessionIdRef.current) {
-        // Attendre la création de la session par l'animateur
         const { data } = await supabase
           .from('dictee_sessions')
           .select('id, status')
@@ -73,10 +62,10 @@ export default function Dictee() {
     return () => clearInterval(interval)
   }, [])
 
-  // Fetch score quand session finished
+  // Fetch score quand finished
   useEffect(() => {
     if (step !== 'fin' || !playerIdRef.current) return
-    const fetch = async () => {
+    const fetchScore = async () => {
       const { data } = await supabase
         .from('players')
         .select('score')
@@ -84,7 +73,7 @@ export default function Dictee() {
         .maybeSingle()
       if (data !== null) setMyScore(data.score)
     }
-    fetch()
+    fetchScore()
   }, [step])
 
   const handleJoin = async () => {
@@ -106,12 +95,6 @@ export default function Dictee() {
     if (!player) return
     playerIdRef.current = player.id
 
-    if (avatarFile) {
-      const url = await uploadAvatar(avatarFile, room.id, player.id)
-      if (url) await supabase.from('players').update({ avatar_url: url }).eq('id', player.id)
-    }
-
-    // Session existante ?
     const { data: session } = await supabase
       .from('dictee_sessions')
       .select('id, status')
@@ -129,7 +112,7 @@ export default function Dictee() {
     }
   }
 
-  // ── Saisie prénom ──────────────────────────────────────────────
+  // ── Prenom ─────────────────────────────────────────────────────
   if (step === 'prenom') {
     return (
       <main className="min-h-screen bg-[#1a1a0f] flex flex-col items-center justify-center p-6 text-white">
@@ -144,18 +127,11 @@ export default function Dictee() {
             className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-center text-lg outline-none focus:border-amber-400/60 transition-colors placeholder:text-white/30"
             autoFocus
           />
-          <div className="flex flex-col items-center gap-3">
-            <div onClick={() => avatarRef.current?.click()} className="cursor-pointer">
-              <PlayerAvatar name={prenom || '?'} avatarUrl={avatarPreview} size={72} />
-            </div>
-            <button type="button" onClick={() => avatarRef.current?.click()}
-              className="text-xs text-white/40 hover:text-white/70 transition-colors">
-              {avatarPreview ? '📷 Changer la photo' : '📷 Ajouter une photo (optionnel)'}
-            </button>
-            <input ref={avatarRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
-          </div>
-          <button onClick={handleJoin} disabled={!prenom.trim()}
-            className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl py-3 text-lg disabled:opacity-30 transition-all active:scale-95">
+          <button
+            onClick={handleJoin}
+            disabled={!prenom.trim()}
+            className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl py-3 text-lg disabled:opacity-30 transition-all active:scale-95"
+          >
             Participer →
           </button>
         </div>
@@ -193,6 +169,17 @@ export default function Dictee() {
         <div className="text-5xl mb-4">✏️</div>
         <h2 className="text-xl font-bold mb-2">Corrigez la copie de votre voisin ✏️</h2>
         <p className="text-white/40 text-sm">L&apos;animateur vous donnera les instructions</p>
+      </main>
+    )
+  }
+
+  // ── Notes ──────────────────────────────────────────────────────
+  if (step === 'notes') {
+    return (
+      <main className="min-h-screen bg-[#1a1a0f] flex flex-col items-center justify-center p-6 text-white text-center">
+        <div className="text-5xl mb-4 animate-pulse">🔢</div>
+        <h2 className="text-xl font-bold mb-2">Notation en cours</h2>
+        <p className="text-white/40 text-sm">L&apos;animateur saisit les notes…</p>
       </main>
     )
   }

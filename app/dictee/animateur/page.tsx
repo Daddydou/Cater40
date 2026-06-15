@@ -9,8 +9,17 @@ const ROOM_CODE = 'dictee'
 const TEXTE_DICTEE =
   'Les orthophonistes travaillent quotidiennement avec des patients qui présentent des troubles du langage. Ils évaluent, diagnostiquent et traitent ces difficultés avec patience et bienveillance. Chaque séance est une opportunité de progresser ensemble vers une meilleure communication.'
 
-type Phase = 'loading' | 'ready' | 'writing' | 'correcting' | 'finished'
+type SessionStatus = 'waiting' | 'writing' | 'correcting' | 'scoring' | 'finished'
+type Phase = 'loading' | 'ready' | 'writing' | 'correcting' | 'scoring' | 'finished'
 type Player = { id: string; name: string; score: number }
+
+const STATUS_TO_PHASE: Record<SessionStatus, Phase> = {
+  waiting:    'ready',
+  writing:    'writing',
+  correcting: 'correcting',
+  scoring:    'scoring',
+  finished:   'finished',
+}
 
 export default function DicteeAnimateur() {
   const router = useRouter()
@@ -62,31 +71,24 @@ export default function DicteeAnimateur() {
 
       if (!session) return
       sessionIdRef.current = session.id
-
-      const phaseMap: Record<string, Phase> = {
-        waiting:    'ready',
-        writing:    'writing',
-        correcting: 'correcting',
-        finished:   'finished',
-      }
-      setPhase(phaseMap[session.status] ?? 'ready')
+      setPhase(STATUS_TO_PHASE[session.status as SessionStatus] ?? 'ready')
       await loadPlayers()
     }
     init()
   }, [loadPlayers])
 
-  // Polling joueurs (utile en phase ready)
+  // Polling joueurs
   useEffect(() => {
     const interval = setInterval(loadPlayers, 2000)
     return () => clearInterval(interval)
   }, [loadPlayers])
 
-  const updateStatus = async (status: string) => {
+  const updateStatus = async (status: SessionStatus) => {
     if (!sessionIdRef.current) return
     await supabase.from('dictee_sessions').update({ status }).eq('id', sessionIdRef.current)
   }
 
-  const handleLancer = async () => {
+  const handleLancerDictee = async () => {
     if (saving) return
     setSaving(true)
     await updateStatus('writing')
@@ -94,11 +96,19 @@ export default function DicteeAnimateur() {
     setSaving(false)
   }
 
-  const handlePasserCorrection = async () => {
+  const handleLancerCorrection = async () => {
     if (saving) return
     setSaving(true)
     await updateStatus('correcting')
     setPhase('correcting')
+    setSaving(false)
+  }
+
+  const handlePasserNotes = async () => {
+    if (saving) return
+    setSaving(true)
+    await updateStatus('scoring')
+    setPhase('scoring')
     setSaving(false)
   }
 
@@ -121,14 +131,12 @@ export default function DicteeAnimateur() {
     }
     await supabase.from('players').delete().eq('room_id', roomRef.current.id)
     sessionIdRef.current = null
-
     const { data: created } = await supabase
       .from('dictee_sessions')
       .insert({ room_id: roomRef.current.id, texte_original: TEXTE_DICTEE, status: 'waiting' })
       .select('id')
       .maybeSingle()
     if (created) sessionIdRef.current = created.id
-
     setPlayers([])
     setScores({})
     setPhase('ready')
@@ -147,7 +155,7 @@ export default function DicteeAnimateur() {
     )
   }
 
-  // ── Ready (waiting) ────────────────────────────────────────────
+  // ── Ready ──────────────────────────────────────────────────────
   if (phase === 'ready') {
     return (
       <main className="min-h-screen bg-[#1a1a0f] text-white px-4 py-8">
@@ -160,12 +168,12 @@ export default function DicteeAnimateur() {
             </p>
           </div>
 
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2 min-h-[80px]">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 min-h-[80px]">
             <p className="text-white/40 text-xs uppercase tracking-wide mb-2">Joueurs inscrits</p>
             {players.length === 0
               ? <p className="text-white/20 text-sm text-center py-2">En attente des joueurs…</p>
               : players.map(p => (
-                <div key={p.id} className="flex items-center gap-2 text-sm">
+                <div key={p.id} className="flex items-center gap-2 text-sm py-0.5">
                   <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
                   <span className="text-white/80">{p.name}</span>
                 </div>
@@ -179,7 +187,7 @@ export default function DicteeAnimateur() {
           </div>
 
           <button
-            onClick={handleLancer}
+            onClick={handleLancerDictee}
             disabled={saving || players.length === 0}
             className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-2xl py-4 text-lg disabled:opacity-30 transition-all active:scale-95"
           >
@@ -213,11 +221,11 @@ export default function DicteeAnimateur() {
           </div>
 
           <button
-            onClick={handlePasserCorrection}
+            onClick={handleLancerCorrection}
             disabled={saving}
             className="w-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold rounded-2xl py-4 disabled:opacity-40 transition-all active:scale-95"
           >
-            {saving ? '⏳…' : '✏️ Passer à la correction'}
+            {saving ? '⏳…' : '✏️ Lancer la correction'}
           </button>
         </div>
       </main>
@@ -228,11 +236,43 @@ export default function DicteeAnimateur() {
   if (phase === 'correcting') {
     return (
       <main className="min-h-screen bg-[#1a1a0f] text-white px-4 py-8">
-        <div className="max-w-md mx-auto space-y-5">
+        <div className="max-w-md mx-auto space-y-6">
           <div className="text-center">
             <div className="text-5xl mb-2">✏️</div>
-            <h1 className="text-2xl font-bold">Correction</h1>
-            <p className="text-white/40 text-sm mt-1">Saisissez la note de chaque joueur</p>
+            <h1 className="text-2xl font-bold">Correction en cours</h1>
+            <p className="text-white/40 text-sm mt-1">Les joueurs corrigent la copie de leur voisin</p>
+          </div>
+
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+            {players.map(p => (
+              <div key={p.id} className="flex items-center gap-2 text-sm py-1">
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                <span className="text-white/70">{p.name}</span>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={handlePasserNotes}
+            disabled={saving}
+            className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-2xl py-4 text-lg disabled:opacity-30 transition-all active:scale-95"
+          >
+            {saving ? '⏳…' : '🔢 Passer aux notes'}
+          </button>
+        </div>
+      </main>
+    )
+  }
+
+  // ── Scoring ────────────────────────────────────────────────────
+  if (phase === 'scoring') {
+    return (
+      <main className="min-h-screen bg-[#1a1a0f] text-white px-4 py-8">
+        <div className="max-w-md mx-auto space-y-5">
+          <div className="text-center">
+            <div className="text-5xl mb-2">🔢</div>
+            <h1 className="text-2xl font-bold">Saisie des notes</h1>
+            <p className="text-white/40 text-sm mt-1">Entrez la note de chaque joueur</p>
           </div>
 
           <div className="space-y-3">

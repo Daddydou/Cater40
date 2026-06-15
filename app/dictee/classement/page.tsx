@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { Suspense, useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import PlayerAvatar from '@/lib/components/PlayerAvatar'
@@ -11,15 +11,15 @@ type Player = { id: string; name: string; score: number; avatar_url?: string | n
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
-export default function DicteeClassement() {
-  const searchParams  = useSearchParams()
-  const isAnimateur   = searchParams.get('a') === '1'
+function ClassementContent() {
+  const searchParams = useSearchParams()
+  const isAnimateur  = searchParams.get('a') === '1'
 
-  const [players, setPlayers]           = useState<Player[]>([])
+  const [players, setPlayers]             = useState<Player[]>([])
   const [revealedCount, setRevealedCount] = useState(0)
-  const [showConfetti, setShowConfetti] = useState(false)
-  const [showMessage, setShowMessage]   = useState(false)
-  const [loading, setLoading]           = useState(true)
+  const [showConfetti, setShowConfetti]   = useState(false)
+  const [showMessage, setShowMessage]     = useState(false)
+  const [loading, setLoading]             = useState(true)
   const roomIdRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -77,13 +77,13 @@ export default function DicteeClassement() {
   if (loading) {
     return (
       <main className="min-h-screen bg-[#1a1a0f] flex items-center justify-center text-white">
-        <p className="text-white/40">Chargement…</p>
+        <p className="text-white/40 animate-pulse">Chargement…</p>
       </main>
     )
   }
 
   // displayOrder : meilleur en haut (index 0), moins bon en bas (index N-1)
-  // On révèle du bas vers le haut : index N-1 en premier, index 0 en dernier
+  // Révélation du bas vers le haut : pire d'abord, meilleur en dernier
   const displayOrder = [...players].reverse()
 
   return (
@@ -115,12 +115,9 @@ export default function DicteeClassement() {
           <p className="text-center text-xs text-white/20">👁 Mode animateur</p>
         )}
 
-        {/* Liste joueurs du meilleur (haut) au moins bon (bas) */}
         <div className="space-y-3">
           {displayOrder.map((p, i) => {
-            // rank : 1 = meilleur (index 0 de displayOrder)
             const rank    = i + 1
-            // révélé si on a révélé suffisamment depuis le bas
             const isShown = i >= displayOrder.length - revealedCount
             const medal   = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`
 
@@ -149,7 +146,6 @@ export default function DicteeClassement() {
           })}
         </div>
 
-        {/* Boutons animateur */}
         {isAnimateur && revealedCount < players.length && (
           <div className="space-y-2">
             <button
@@ -176,5 +172,17 @@ export default function DicteeClassement() {
 
       </div>
     </main>
+  )
+}
+
+export default function ClassementPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#1a1a0f] flex items-center justify-center">
+        <p className="text-white animate-pulse">Chargement…</p>
+      </div>
+    }>
+      <ClassementContent />
+    </Suspense>
   )
 }
