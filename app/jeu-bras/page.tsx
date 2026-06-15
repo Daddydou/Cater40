@@ -11,6 +11,7 @@ const BUCKET_URL =
   'https://ubnkuwyqclrjckogldlc.supabase.co/storage/v1/object/public/jeu-bras'
 
 type UIState =
+  | 'prenom'
   | 'loading'
   | 'no-room'
   | 'waiting'
@@ -54,16 +55,17 @@ function parseGameState(currentGame: string | null): { uiState: UIState; index: 
   return { uiState: 'waiting', index: 0 }
 }
 
+const ACTIVE_STATES: UIState[] = ['playing', 'feedback-bon', 'feedback-faux', 'finished']
+
 export default function JeuBrasCater() {
+  const [prenom, setPrenom] = useState('')
   const [room, setRoom] = useState<{ id: string; code: string; status: string } | null>(null)
   const [photos, setPhotos] = useState<string[]>([])
-  const [uiState, setUiState] = useState<UIState>('loading')
+  const [uiState, setUiState] = useState<UIState>('prenom')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [finalScore, setFinalScore] = useState<number | null>(null)
   const roomRef = useRef<{ id: string } | null>(null)
-  const uiStateRef = useRef<UIState>('loading')
-
-  const ACTIVE_STATES: UIState[] = ['playing', 'feedback-bon', 'feedback-faux', 'finished']
+  const uiStateRef = useRef<UIState>('prenom')
 
   const applyGameState = useCallback((currentGame: string | null) => {
     const { uiState: newState, index } = parseGameState(currentGame)
@@ -74,7 +76,6 @@ export default function JeuBrasCater() {
     uiStateRef.current = newState
     setUiState(newState)
     setCurrentIndex(index)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const pollRoom = useCallback(async () => {
@@ -87,33 +88,7 @@ export default function JeuBrasCater() {
     if (data) applyGameState(data.current_game)
   }, [applyGameState])
 
-  useEffect(() => {
-    const init = async () => {
-      const activeRoom = await getActiveRoom()
-      if (!activeRoom) {
-        setUiState('no-room')
-        return
-      }
-      setRoom(activeRoom)
-      roomRef.current = activeRoom
-
-      const { data: files } = await supabase.storage.from('jeu-bras').list()
-      const filtered = (files ?? [])
-        .filter(f => /\.(jpg|jpeg|png)$/i.test(f.name))
-        .map(f => f.name)
-      const shuffled = shuffleWithSeed(filtered, seedFromRoomId(activeRoom.id))
-      setPhotos(shuffled)
-
-      const { data: roomData } = await supabase
-        .from('rooms')
-        .select('current_game')
-        .eq('id', activeRoom.id)
-        .maybeSingle()
-      if (roomData) applyGameState(roomData.current_game)
-    }
-    init()
-  }, [applyGameState])
-
+  // Realtime — démarre seulement quand room est défini (après handleJoin)
   useEffect(() => {
     if (!room) return
     const channel = supabase
@@ -127,6 +102,7 @@ export default function JeuBrasCater() {
     return () => { supabase.removeChannel(channel) }
   }, [room, applyGameState])
 
+  // Polling fallback — démarre seulement quand room est défini (après handleJoin)
   useEffect(() => {
     if (!room) return
     const interval = setInterval(pollRoom, 2000)
@@ -147,6 +123,37 @@ export default function JeuBrasCater() {
     fetchScore()
   }, [uiState])
 
+  const handleJoin = async () => {
+    if (!prenom.trim()) return
+    setUiState('loading')
+
+    const activeRoom = await getActiveRoom()
+    if (!activeRoom) {
+      setUiState('no-room')
+      return
+    }
+
+    roomRef.current = activeRoom
+
+    const { data: files } = await supabase.storage.from('jeu-bras').list()
+    const filtered = (files ?? [])
+      .filter(f => /\.(jpg|jpeg|png)$/i.test(f.name))
+      .map(f => f.name)
+    const shuffled = shuffleWithSeed(filtered, seedFromRoomId(activeRoom.id))
+    setPhotos(shuffled)
+
+    const { data: roomData } = await supabase
+      .from('rooms')
+      .select('current_game')
+      .eq('id', activeRoom.id)
+      .maybeSingle()
+
+    // Déclenche realtime + polling
+    setRoom(activeRoom)
+
+    if (roomData) applyGameState(roomData.current_game)
+  }
+
   const currentPhoto = photos[currentIndex]
   const pct =
     photos.length > 0 && finalScore !== null
@@ -154,11 +161,29 @@ export default function JeuBrasCater() {
       : 0
   const result = getResultLevel(pct)
 
-  // ── No room ────────────────────────────────────────────────────
-  if (uiState === 'no-room') {
+  // ── Saisie prénom ──────────────────────────────────────────────
+  if (uiState === 'prenom') {
     return (
-      <main className={`${nunito.className} min-h-screen bg-[#0a0a0a] flex items-center justify-center`}>
-        <p className="text-white/40 text-lg">Aucune partie en cours</p>
+      <main className={`${nunito.className} min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center gap-6 px-6`}>
+        <div className="text-7xl">💪</div>
+        <h1 className="text-white text-3xl font-bold text-center">Gros Bras</h1>
+        <div className="w-full max-w-sm flex flex-col gap-4">
+          <input
+            value={prenom}
+            onChange={e => setPrenom(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleJoin()}
+            placeholder="Ton prénom"
+            autoFocus
+            className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white text-center text-lg outline-none focus:border-[#FFD700]/60 transition-colors placeholder:text-white/30"
+          />
+          <button
+            onClick={handleJoin}
+            disabled={!prenom.trim()}
+            className="w-full bg-[#FFD700] hover:bg-yellow-300 text-black font-bold rounded-2xl py-4 text-xl transition-all active:scale-95 disabled:opacity-30"
+          >
+            Rejoindre →
+          </button>
+        </div>
       </main>
     )
   }
@@ -172,6 +197,21 @@ export default function JeuBrasCater() {
     )
   }
 
+  // ── No room ────────────────────────────────────────────────────
+  if (uiState === 'no-room') {
+    return (
+      <main className={`${nunito.className} min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center gap-4`}>
+        <p className="text-white/40 text-lg">Aucune partie en cours</p>
+        <button
+          onClick={() => setUiState('prenom')}
+          className="text-white/20 hover:text-white/50 text-sm underline underline-offset-4 transition-colors"
+        >
+          ← Réessayer
+        </button>
+      </main>
+    )
+  }
+
   // ── Waiting ────────────────────────────────────────────────────
   if (uiState === 'waiting') {
     return (
@@ -180,7 +220,9 @@ export default function JeuBrasCater() {
         <h1 className="text-white text-3xl font-bold text-center">Gros Bras</h1>
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-[#FFD700] border-t-transparent rounded-full animate-spin" />
-          <p className="text-white/40 text-sm text-center">En attente du lancement…</p>
+          <p className="text-white/40 text-sm text-center">
+            Bonjour {prenom} — En attente du lancement…
+          </p>
         </div>
       </main>
     )
