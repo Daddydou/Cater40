@@ -33,6 +33,30 @@ CREATE TABLE famille_or_reponses (
   created_at timestamp DEFAULT now()
 );
 
+-- Migration : colonnes finale sur la session
+ALTER TABLE famille_or_sessions ADD COLUMN IF NOT EXISTS finale_status text;
+ALTER TABLE famille_or_sessions ADD COLUMN IF NOT EXISTS finale_rep_eq1 uuid;
+ALTER TABLE famille_or_sessions ADD COLUMN IF NOT EXISTS finale_rep_eq2 uuid;
+ALTER TABLE famille_or_sessions ADD COLUMN IF NOT EXISTS finale_question_ordre integer DEFAULT 0;
+
+-- Colonnes représentants et révélation sur les questions
+ALTER TABLE famille_or_questions ADD COLUMN IF NOT EXISTS representant_eq1 uuid;
+ALTER TABLE famille_or_questions ADD COLUMN IF NOT EXISTS representant_eq2 uuid;
+ALTER TABLE famille_or_questions ADD COLUMN IF NOT EXISTS buzzer_winner_id uuid;
+
+-- Table finale
+CREATE TABLE IF NOT EXISTS famille_or_finale (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id uuid REFERENCES famille_or_sessions(id),
+  ordre integer,
+  question text,
+  reponse_eq1 text,
+  reponse_eq2 text,
+  points integer DEFAULT 20,
+  status text DEFAULT 'pending',
+  created_at timestamp DEFAULT now()
+);
+
 ALTER TABLE famille_or_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE famille_or_questions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE famille_or_reponses ENABLE ROW LEVEL SECURITY;
