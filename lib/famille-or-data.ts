@@ -9,6 +9,17 @@ export interface FamilleOrQuestionData {
   reponses: FamilleOrReponseData[];
 }
 
+export interface FinaleReponseData {
+  texte: string
+  points: number
+}
+export interface FinaleQuestionData {
+  ordre: number
+  question: string
+  points: number
+  reponses: FinaleReponseData[]
+}
+
 export const defaultQuestions: FamilleOrQuestionData[] = [
   {
     question: "Citez quelque chose qu'on fait en secret dans les toilettes",
@@ -32,3 +43,28 @@ export const defaultQuestions: FamilleOrQuestionData[] = [
     ],
   },
 ];
+
+export const defaultFinaleQuestions: FinaleQuestionData[] = [
+  {
+    ordre: 1,
+    question: "Citez quelque chose qu'on fait toujours en dernière minute",
+    points: 30,
+    reponses: [
+      { texte: "Les valises", points: 40 },
+      { texte: "Les devoirs", points: 30 },
+      { texte: "Les impôts", points: 20 },
+      { texte: "Acheter un cadeau", points: 10 },
+    ]
+  },
+  {
+    ordre: 2,
+    question: "Citez un mot qu'on écrit souvent mal",
+    points: 25,
+    reponses: [
+      { texte: "Ça / sa", points: 40 },
+      { texte: "Quand / quant", points: 30 },
+      { texte: "Leur / leurs", points: 20 },
+      { texte: "Davantage / d'avantage", points: 10 },
+    ]
+  },
+]

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mots croisés — Cater 40</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Georgia,serif;background:#f9f7f2;color:#222;padding:20px}
+h1{text-align:center;font-size:22px;color:#333;margin-bottom:4px}
+.sub{text-align:center;font-size:12px;color:#aaa;margin-bottom:20px;letter-spacing:.05em}
+.layout{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.grid-wrap{overflow-x:auto}
+table{border-collapse:collapse;border:2px solid #333}
+td{width:26px;height:26px;border:0.5px solid #bbb;background:#fff;text-align:center;vertical-align:middle;position:relative;padding:0;font-size:12px;font-weight:bold;font-family:Arial,sans-serif}
+td.black{background:#1c1c1c;border-color:#1c1c1c}
+.num{position:absolute;top:1px;left:2px;font-size:7px;font-weight:bold;color:#666;line-height:1;font-family:Arial,sans-serif}
+.defs{width:320px;font-size:11.5px;line-height:1.8}
+.defs h3{font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#888;border-bottom:1px solid #ddd;padding-bottom:3px;margin:14px 0 5px}
+.item{display:flex;gap:5px;margin-bottom:1px;align-items:baseline}
+.n{font-weight:bold;min-width:20px;color:#333;font-family:Arial,sans-serif;font-size:10.5px}
+.d{color:#444}
+.sol-btn{display:block;margin:12px auto 0;padding:6px 16px;font-size:11px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#fff;color:#666}
+.sol-btn:hover{background:#f0f0f0}
+@media print{body{padding:3mm;background:white}.sol-btn{display:none}}
+</style>
+</head>
+<body>
+<h1>🎂 Mots croisés — Cater 40</h1>
+<div class="sub">50 mots · bonne chance !</div>
+<div class="layout">
+<div class="grid-wrap">
+<table id="grid"></table>
+<button class="sol-btn" onclick="toggleSol()">Afficher / Masquer les réponses</button>
+</div>
+<div class="defs">
+<h3>→ Horizontalement</h3>
+<div id="horiz"></div>
+<h3>↓ Verticalement</h3>
+<div id="vert"></div>
+</div>
+</div>
+<script>
+const ROWS=26,COLS=36;
+const wordData=[
+  ["BLANCHEGARDIN",4,5,true],["ESSEPTIONNEL",4,11,false],["POINTVIRGULE",8,11,true],
+  ["SANDRABONDON",0,14,false],["TRANSPONSTER",1,12,true],["MARCLAFLEUR",15,7,true],
+  ["HTBICHETTE",7,2,true],["SAUCISSIER",14,8,false],["PUTAHCREEK",17,3,true],
+  ["MONTEMONTE",10,13,true],["MADELEINE",5,22,false],["DESPROGES",7,22,true],
+  ["CASSOULET",19,6,true],["BRUSHING",23,7,true],["RHOMDANE",5,19,true],
+  ["SCARLETT",13,17,true],["EVAGREEN",12,4,true],["BAPTISTE",21,4,true],
+  ["THONMAYO",13,23,false],["ALBANIA",2,5,false],["JUSTINE",16,18,true],
+  ["HORLOGE",7,7,false],["GEORGIE",4,26,false],["SCHNECK",7,30,false],
+  ["MONIQUE",20,22,true],["RUINART",2,1,true],["GAIVOTA",4,26,true],
+  ["POULET",10,4,true],["STMALO",0,21,false],["MYTHOS",20,22,false],
+  ["ROTOLO",24,21,true],["CADIOU",8,30,true],["LALIBI",3,20,true],
+  ["DOWELL",11,27,true],["SIFNOS",16,20,false],["JULES",21,16,true],
+  ["MAKIS",18,22,true],["BUNNY",7,20,false],["DOIGT",9,24,true],
+  ["PLAKA",13,27,true],["BOUM",6,14,true],["HUIT",7,2,false],
+  ["ZEUS",14,15,false],["OURS",8,34,false],["WAIT",9,0,true],
+  ["BLEU",21,4,false],["TIM",22,22,true],["FAB",3,32,false],
+  ["TEX",23,3,true],["PDV",13,27,false]
+];
+const defs={
+  OURS:"1er geste de Kali",ZEUS:"Dieu des cafards",MYTHOS:"Grosse menteuse de bière",
+  SIFNOS:"Nos SIF à l'envers",WAIT:"Parole de feu à NYC",TEX:"Effigie de sceptre",
+  MONTEMONTE:"Ascension de Sainte Lucie",PLAKA:"Hélas y en a pas",
+  MAKIS:"Feeleur d'island dans son algue",DOIGT:"Si on ne compte pas la mer, 4 font 1",
+  GAIVOTA:"Et soudain la mouette lusophone",BOUM:"And suddenly Sophie Maupu",
+  DOWELL:"Sure d'elle au mariage",EVAGREEN:"Coussin aux yeux verts",
+  SANDRABONDON:"Gauloise grillée à l'opéra mais surtout à l'Ibis",
+  CADIOU:"Mauvais acteur",JULES:"Renard canadien",
+  MONIQUE:"Grand-mère qui doit jeter sa pâte à dents",
+  BUNNY:"Et l'AVC fit le rongeur",MADELEINE:"Gaffe à ta banane… ?",
+  SAUCISSIER:"Profession de menteuse",TRANSPONSTER:"That's not even a word",
+  TIM:"Canon ou Hortons",POULET:"Saint Hubert pas 41",
+  JUSTINE:"À t-elle pris sa claque ?",HUIT:"Thermostat de plage",
+  MARCLAFLEUR:"Pervenche mis à l'amende",THONMAYO:"Mets de CLC",
+  SCARLETT:"Sclaguiller (à NY ou à la gym)",FAB:"Qui est cet homme sur la photo ?",
+  DESPROGES:"Tu connais cet humoriste ?",LALIBI:"Bar qui mit au ban le ban",
+  HORLOGE:"Tic tac bières",HTBICHETTE:"Le supplice du roux",
+  SCHNECK:"Joey ! It's a snail !",
+  BLEU:"Tu as un slip qui irait hyper bien avec leurs volets",
+  ALBANIA:"Insistance de taxi",PDV:"Place de taxis",
+  ROTOLO:"Plaque qui pose une plaque",RUINART:"Prosecco chaud",
+  PUTAHCREEK:"Pikachu californien",STMALO:"On dit que c'est la merde là-bas",
+  BAPTISTE:"Importante mission",POINTVIRGULE:"Point de discorde en mémoire",
+  RHOMDANE:"Le plus insistant des Ben",GEORGIE:"Pays sans film",
+  ESSEPTIONNEL:"Bout de ligne",BLANCHEGARDIN:"Ni noire ni sosie",
+  CASSOULET:"Meilleur par 40°",BRUSHING:"Tu veux accoucher, mal entendu"
+};
+
+// Build letter grid
+const G=Array.from({length:ROWS},()=>Array(COLS).fill('.'));
+wordData.forEach(([w,r,c,H])=>{
+  for(let i=0;i<w.length;i++){
+    if(H) G[r][c+i]=w[i];
+    else G[r+i][c]=w[i];
+  }
+});
+
+// Number starting cells (sorted row then col)
+const starts={};
+wordData.forEach(([w,r,c,H])=>{
+  const k=r+','+c;
+  if(!starts[k]) starts[k]=[];
+  starts[k].push([w,H]);
+});
+const sortedKeys=Object.keys(starts).sort((a,b)=>{
+  const [ar,ac]=a.split(',').map(Number);
+  const [br,bc]=b.split(',').map(Number);
+  return ar!==br?ar-br:ac-bc;
+});
+const cellNum={};
+let num=1;
+sortedKeys.forEach(k=>{cellNum[k]=num++;});
+
+const wordNum={};
+wordData.forEach(([w,r,c,H])=>{wordNum[w]=[cellNum[r+','+c],H];});
+
+// Render grid
+const tbl=document.getElementById('grid');
+for(let r=0;r<ROWS;r++){
+  const tr=document.createElement('tr');
+  for(let c=0;c<COLS;c++){
+    const td=document.createElement('td');
+    if(G[r][c]==='.'){
+      td.className='black';
+    } else {
+      td.dataset.letter=G[r][c];
+      const k=r+','+c;
+      if(cellNum[k]){
+        const sp=document.createElement('span');
+        sp.className='num'; sp.textContent=cellNum[k];
+        td.appendChild(sp);
+      }
+    }
+    tr.appendChild(td);
+  }
+  tbl.appendChild(tr);
+}
+
+// Definitions
+const horiz=Object.entries(wordNum).filter(([w,[n,H]])=>H).sort((a,b)=>a[1][0]-b[1][0]);
+const vert =Object.entries(wordNum).filter(([w,[n,H]])=>!H).sort((a,b)=>a[1][0]-b[1][0]);
+function renderDefs(arr,el){
+  arr.forEach(([w,[n]])=>{
+    const div=document.createElement('div');
+    div.className='item';
+    div.innerHTML=`<span class="n">${n}.</span><span class="d">${defs[w]}</span>`;
+    el.appendChild(div);
+  });
+}
+renderDefs(horiz,document.getElementById('horiz'));
+renderDefs(vert,document.getElementById('vert'));
+
+// Toggle solution
+let solVisible=false;
+function toggleSol(){
+  solVisible=!solVisible;
+  document.querySelectorAll('td[data-letter]').forEach(td=>{
+    const existing=td.querySelector('.sol');
+    if(solVisible){
+      if(!existing){
+        const s=document.createElement('span');
+        s.className='sol';
+        s.textContent=td.dataset.letter;
+        s.style.cssText='font-size:11px;font-weight:bold;color:#c00';
+        td.appendChild(s);
+      }
+    } else {
+      if(existing) existing.remove();
+    }
+  });
+}
+</script>
+</body>
+</html>

@@ -17,11 +17,15 @@ type Session = {
   status: string
   finale_rep_eq1: string | null
   finale_rep_eq2: string | null
+  finale_rep1_valide: boolean
+  finale_rep2_valide: boolean
+  finale_correction_ordre: number
 }
 type FinaleQuestion = {
   id: string; ordre: number; question: string
   reponse_eq1: string | null; reponse_eq2: string | null
   points: number; status: string
+  points_eq1: number; points_eq2: number
 }
 type Question = {
   id: string
@@ -60,9 +64,10 @@ export default function FamilleOrJoueurs() {
   const [loading, setLoading]       = useState(true)
   const [joined, setJoined]         = useState(false)
   const [buzzed, setBuzzed]         = useState(false)
+  const [finaleQuestions, setFinaleQuestions] = useState<FinaleQuestion[]>([])
   const [finaleQ, setFinaleQ]       = useState<FinaleQuestion | null>(null)
-  const [finaleReponse, setFinaleReponse] = useState('')
-  const [finaleSent, setFinaleSent] = useState(false)
+  const [finaleReponses, setFinaleReponses] = useState<Record<string, string>>({})
+  const [finaleValide, setFinaleValide] = useState(false)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
@@ -91,13 +96,13 @@ export default function FamilleOrJoueurs() {
       if (sess) {
         setSession(sess)
         if (sess.status === 'finale') {
-          const { data: fq } = await supabase
+          const { data: fqs } = await supabase
             .from('famille_or_finale').select('*')
-            .eq('session_id', sess.id).eq('status', 'active').maybeSingle()
-          setFinaleQ(prev => {
-            if (fq?.id !== prev?.id) setFinaleSent(false)
-            return fq
-          })
+            .eq('session_id', sess.id).order('ordre')
+          if (fqs) {
+            setFinaleQuestions(fqs)
+            setFinaleQ(fqs.find(q => q.status === 'active') ?? null)
+          }
           setLoading(false)
           return
         }
@@ -140,13 +145,16 @@ export default function FamilleOrJoueurs() {
     }
   }
 
-  const handleEnvoyerReponseFinale = async () => {
-    if (!finaleQ || !myPlayer || !session || finaleSent) return
+  const handleValiderToutesReponsesFinale = async () => {
+    if (!session || !myPlayer || finaleValide) return
     const isEq1 = myPlayer.id === session.finale_rep_eq1
-    const field = isEq1 ? 'reponse_eq1' : 'reponse_eq2'
-    await supabase.from('famille_or_finale').update({ [field]: finaleReponse }).eq('id', finaleQ.id)
-    setFinaleSent(true)
-    setFinaleReponse('')
+    for (const [questionId, reponse] of Object.entries(finaleReponses)) {
+      const field = isEq1 ? 'reponse_eq1' : 'reponse_eq2'
+      await supabase.from('famille_or_finale').update({ [field]: reponse }).eq('id', questionId)
+    }
+    const valideField = isEq1 ? 'finale_rep1_valide' : 'finale_rep2_valide'
+    await supabase.from('famille_or_sessions').update({ [valideField]: true }).eq('id', session.id)
+    setFinaleValide(true)
   }
 
   const handleBuzz = async () => {
@@ -217,55 +225,107 @@ export default function FamilleOrJoueurs() {
   }
 
   // ── Finale ────────────────────────────────────────────────
-  if (session?.status === 'finale' && finaleQ) {
-    const isRep = myPlayer && (session.finale_rep_eq1 === myPlayer.id || session.finale_rep_eq2 === myPlayer.id)
-    return (
-      <main className="min-h-screen bg-[#1a237e] text-white p-6 flex flex-col items-center justify-center">
-        <div className="w-full max-w-sm space-y-5">
-          <div className="text-center">
-            <div className="text-5xl mb-2">🏆</div>
-            <p className="text-purple-300 font-bold text-lg">FINALE — Q{finaleQ.ordre}</p>
-            <p className="text-white/40 text-xs">{finaleQ.points} points</p>
-          </div>
-          <div className="bg-blue-800/50 border border-white/10 rounded-2xl p-4 text-center">
-            <p className="font-bold text-lg leading-snug">{finaleQ.question}</p>
-          </div>
-          {isRep ? (
-            finaleSent ? (
-              <div className="text-center space-y-2">
-                <div className="text-4xl">✅</div>
-                <p className="text-green-300 font-bold">Réponse envoyée !</p>
-                <p className="text-white/40 text-sm">En attente de l&apos;autre équipe…</p>
-              </div>
+  if (session?.status === 'finale') {
+    const isRep = myPlayer && (
+      session.finale_rep_eq1 === myPlayer.id ||
+      session.finale_rep_eq2 === myPlayer.id
+    )
+    const isEq1 = myPlayer && session.finale_rep_eq1 === myPlayer.id
+    const myValide = isEq1 ? session.finale_rep1_valide : session.finale_rep2_valide
+
+    // Phase saisie — avant que les 2 aient validé
+    if (!session.finale_rep1_valide || !session.finale_rep2_valide) {
+      return (
+        <main className="min-h-screen bg-[#1a237e] text-white p-6">
+          <div className="max-w-sm mx-auto space-y-5">
+            <div className="text-center pt-2">
+              <div className="text-4xl mb-1">🏆</div>
+              <p className="text-purple-300 font-bold text-lg">FINALE</p>
+            </div>
+            {isRep ? (
+              myValide ? (
+                <div className="text-center space-y-3 pt-8">
+                  <div className="text-5xl">✅</div>
+                  <p className="text-green-300 font-bold text-xl">Réponses envoyées !</p>
+                  <p className="text-white/40 text-sm">En attente de l&apos;autre équipe…</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {finaleQuestions.map(fq => (
+                    <div key={fq.id} className="bg-blue-800/50 border border-white/10 rounded-2xl p-4 space-y-3">
+                      <p className="text-xs text-purple-300/60">Q{fq.ordre}</p>
+                      <p className="font-bold text-base leading-snug">{fq.question}</p>
+                      <input
+                        value={finaleReponses[fq.id] ?? ''}
+                        onChange={e => setFinaleReponses(prev => ({ ...prev, [fq.id]: e.target.value }))}
+                        placeholder="Ta réponse…"
+                        className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-sm outline-none focus:border-purple-400 transition-colors"
+                      />
+                    </div>
+                  ))}
+                  <button
+                    onClick={handleValiderToutesReponsesFinale}
+                    disabled={finaleQuestions.some(fq => !finaleReponses[fq.id]?.trim())}
+                    className="w-full bg-purple-500 hover:bg-purple-400 text-white font-bold rounded-xl py-4 disabled:opacity-30 transition-all active:scale-95">
+                    ✅ Valider mes réponses
+                  </button>
+                </div>
+              )
             ) : (
-              <div className="space-y-3">
-                <input value={finaleReponse} onChange={e => setFinaleReponse(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleEnvoyerReponseFinale()}
-                  placeholder="Ta réponse…"
-                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-center text-lg outline-none focus:border-purple-400 transition-colors"
-                  autoFocus />
-                <button onClick={handleEnvoyerReponseFinale} disabled={!finaleReponse.trim()}
-                  className="w-full bg-purple-500 hover:bg-purple-400 text-white font-bold rounded-xl py-3 disabled:opacity-30 transition-all active:scale-95">
-                  Envoyer →
-                </button>
+              <div className="text-center text-white/40 pt-8">
+                <p className="text-4xl mb-3">👀</p>
+                <p>Tu es spectateur pour la finale</p>
+                <p className="text-xs mt-2">
+                  {session.finale_rep1_valide ? '✅' : '⏳'} {session.equipe1_nom} ·
+                  {session.finale_rep2_valide ? ' ✅' : ' ⏳'} {session.equipe2_nom}
+                </p>
               </div>
-            )
-          ) : (
-            <div className="text-center text-white/40">
-              <p>Tu es spectateur pour cette question</p>
+            )}
+          </div>
+        </main>
+      )
+    }
+
+    // Phase correction / récap — affichage des questions corrigées
+    const closedQuestions = finaleQuestions.filter(q => q.status === 'closed')
+    const activeQ = finaleQuestions.find(q => q.status === 'active')
+    return (
+      <main className="min-h-screen bg-[#1a237e] text-white p-6">
+        <div className="max-w-sm mx-auto space-y-4">
+          <div className="text-center pt-2">
+            <div className="text-4xl mb-1">🏆</div>
+            <p className="text-purple-300 font-bold text-lg">FINALE — Correction</p>
+          </div>
+          {closedQuestions.map(fq => (
+            <div key={fq.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+              <p className="font-bold text-sm">{fq.question}</p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-yellow-400/10 border border-yellow-400/20 rounded-xl p-2">
+                  <p className="text-yellow-300/60 mb-1">{session.equipe1_nom}</p>
+                  <p className="font-medium">{fq.reponse_eq1 ?? '—'}</p>
+                  <p className="text-yellow-300 font-bold mt-1">{fq.points_eq1 > 0 ? `+${fq.points_eq1} pts` : '0 pt'}</p>
+                </div>
+                <div className="bg-blue-400/10 border border-blue-400/20 rounded-xl p-2">
+                  <p className="text-blue-300/60 mb-1">{session.equipe2_nom}</p>
+                  <p className="font-medium">{fq.reponse_eq2 ?? '—'}</p>
+                  <p className="text-blue-300 font-bold mt-1">{fq.points_eq2 > 0 ? `+${fq.points_eq2} pts` : '0 pt'}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+          {activeQ && (
+            <div className="bg-blue-800/30 border border-white/5 rounded-2xl p-4 text-center">
+              <p className="text-white/30 text-sm">⏳ Correction en cours…</p>
+              <p className="text-white/50 text-xs mt-1">{activeQ.question}</p>
+            </div>
+          )}
+          {finaleQuestions.length > 0 && finaleQuestions.every(q => q.status === 'closed') && (
+            <div className="bg-purple-500/20 border border-purple-400 rounded-2xl p-4 text-center space-y-2">
+              <p className="text-purple-300 font-bold">🏆 Finale terminée !</p>
+              <p className="text-white/40 text-xs">En attente du classement final…</p>
             </div>
           )}
         </div>
-      </main>
-    )
-  }
-
-  if (session?.status === 'finale' && !finaleQ) {
-    return (
-      <main className="min-h-screen bg-[#1a237e] flex flex-col items-center justify-center p-6 text-white text-center">
-        <div className="text-5xl mb-4">🏆</div>
-        <p className="text-purple-300 font-bold text-xl">FINALE</p>
-        <p className="text-white/50 mt-2">En attente de la prochaine question…</p>
       </main>
     )
   }

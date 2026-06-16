@@ -54,8 +54,21 @@ CREATE TABLE IF NOT EXISTS famille_or_finale (
   reponse_eq2 text,
   points integer DEFAULT 20,
   status text DEFAULT 'pending',
+  reponses text,
+  points_eq1 integer DEFAULT 0,
+  points_eq2 integer DEFAULT 0,
   created_at timestamp DEFAULT now()
 );
+
+-- Migration : colonnes points par équipe sur les questions finale
+ALTER TABLE famille_or_finale ADD COLUMN IF NOT EXISTS reponses text;
+ALTER TABLE famille_or_finale ADD COLUMN IF NOT EXISTS points_eq1 INTEGER DEFAULT 0;
+ALTER TABLE famille_or_finale ADD COLUMN IF NOT EXISTS points_eq2 INTEGER DEFAULT 0;
+
+-- Migration : colonnes validation et correction sur la session
+ALTER TABLE famille_or_sessions ADD COLUMN IF NOT EXISTS finale_rep1_valide BOOLEAN DEFAULT FALSE;
+ALTER TABLE famille_or_sessions ADD COLUMN IF NOT EXISTS finale_rep2_valide BOOLEAN DEFAULT FALSE;
+ALTER TABLE famille_or_sessions ADD COLUMN IF NOT EXISTS finale_correction_ordre INTEGER DEFAULT 1;
 
 ALTER TABLE famille_or_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE famille_or_questions ENABLE ROW LEVEL SECURITY;

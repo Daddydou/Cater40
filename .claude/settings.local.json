@@ -45,7 +45,9 @@
       "WebFetch(domain:worldcupstats.football)",
       "WebFetch(domain:heavy.com)",
       "WebFetch(domain:www.soccergraph.com)",
-      "PowerShell(git *)"
+      "PowerShell(git *)",
+      "Bash(python3 *)",
+      "Bash(python /tmp/fix_finale.py)"
     ]
   }
 }

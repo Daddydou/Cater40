@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { defaultQuestions } from '@/lib/famille-or-data'
+import { defaultQuestions, defaultFinaleQuestions } from '@/lib/famille-or-data'
 import PlayerAvatar from '@/lib/components/PlayerAvatar'
 
 const ROOM_CODE = 'famille-or'
@@ -21,6 +21,9 @@ type Session = {
   finale_rep_eq1: string | null
   finale_rep_eq2: string | null
   finale_question_ordre: number
+  finale_rep1_valide: boolean
+  finale_rep2_valide: boolean
+  finale_correction_ordre: number
 }
 
 type FinaleQuestion = {
@@ -31,12 +34,10 @@ type FinaleQuestion = {
   reponse_eq2: string | null
   points: number
   status: string
+  points_eq1: number
+  points_eq2: number
+  reponses: string
 }
-
-const defaultFinaleQuestions = [
-  { ordre: 1, question: "Citez quelque chose qu'on fait toujours en dernier minute", points: 30 },
-  { ordre: 2, question: "Citez un mot qu'on écrit souvent mal", points: 25 },
-]
 type Question = {
   id: string
   ordre: number
@@ -89,6 +90,8 @@ export default function FamilleOrAnimateur() {
   const [selectingQ, setSelectingQ]   = useState<Question | null>(null)
   const [finaleQuestions, setFinaleQuestions] = useState<FinaleQuestion[]>([])
   const [finaleQ, setFinaleQ]         = useState<FinaleQuestion | null>(null)
+  const [finaleReponseEq1, setFinaleReponseEq1] = useState<string | null>(null)
+  const [finaleReponseEq2, setFinaleReponseEq2] = useState<string | null>(null)
   const [finaleRep1, setFinaleRep1]   = useState<string | null>(null)
   const [finaleRep2, setFinaleRep2]   = useState<string | null>(null)
   const [showFinaleSetup, setShowFinaleSetup] = useState(false)
@@ -466,13 +469,17 @@ export default function FamilleOrAnimateur() {
   // ── FINALE ────────────────────────────────────────────────
   const handleLancerFinale = async () => {
     if (!session || !finaleRep1 || !finaleRep2) return
-    for (const q of defaultFinaleQuestions) {
+    for (let i = 0; i < defaultFinaleQuestions.length; i++) {
+      const q = defaultFinaleQuestions[i]
       await supabase.from('famille_or_finale').insert({
         session_id: session.id,
         ordre: q.ordre,
         question: q.question,
-        status: 'pending',
+        status: i === 0 ? 'active' : 'pending',
         points: q.points,
+        reponses: JSON.stringify(q.reponses),
+        points_eq1: 0,
+        points_eq2: 0,
       })
     }
     await supabase.from('famille_or_sessions').update({
@@ -480,32 +487,48 @@ export default function FamilleOrAnimateur() {
       finale_status: 'playing',
       finale_rep_eq1: finaleRep1,
       finale_rep_eq2: finaleRep2,
-      finale_question_ordre: 0,
+      finale_question_ordre: 1,
+      finale_rep1_valide: false,
+      finale_rep2_valide: false,
+      finale_correction_ordre: 1,
     }).eq('id', session.id)
     setShowFinaleSetup(false)
     await fetchFinale(session.id)
     await fetchSession(session.id)
   }
 
-  const handleLancerQuestionFinale = async (fq: FinaleQuestion) => {
-    if (!session) return
-    await supabase.from('famille_or_finale').update({ status: 'closed' })
-      .eq('session_id', session.id).eq('status', 'active')
-    await supabase.from('famille_or_finale').update({ status: 'active' }).eq('id', fq.id)
-    await supabase.from('famille_or_sessions').update({ finale_question_ordre: fq.ordre }).eq('id', session.id)
+  const handleValiderPointsFinaleEq = async (equipe: 1 | 2, texte: string | null, points: number) => {
+    if (!finaleQ || !session) return
+    const field = equipe === 1 ? 'points_eq1' : 'points_eq2'
+    await supabase.from('famille_or_finale').update({ [field]: points }).eq('id', finaleQ.id)
+    if (equipe === 1) setFinaleReponseEq1(texte)
+    else setFinaleReponseEq2(texte)
     await fetchFinale(session.id)
   }
 
-  const handleValiderFinalePoints = async (fq: FinaleQuestion, equipe: 1 | 2) => {
-    if (!session) return
-    const scoreField = equipe === 1 ? 'equipe1_score' : 'equipe2_score'
-    const currentScore = equipe === 1 ? session.equipe1_score : session.equipe2_score
-    await supabase.from('famille_or_sessions').update({
-      [scoreField]: currentScore + fq.points
-    }).eq('id', session.id)
-    await supabase.from('famille_or_finale').update({ status: 'closed' }).eq('id', fq.id)
+  const handleCloturerQuestion = async () => {
+    if (!finaleQ || !session) return
+    await supabase.from('famille_or_finale').update({ status: 'closed' }).eq('id', finaleQ.id)
+    const nextOrdre = (session.finale_correction_ordre ?? 1) + 1
+    await supabase.from('famille_or_sessions').update({ finale_correction_ordre: nextOrdre }).eq('id', session.id)
+    const next = finaleQuestions.find(q => q.ordre === nextOrdre)
+    if (next) {
+      await supabase.from('famille_or_finale').update({ status: 'active' }).eq('id', next.id)
+    }
     await fetchFinale(session.id)
     await fetchSession(session.id)
+  }
+
+  const handleClassementFinale = async () => {
+    if (!session) return
+    const totalEq1 = finaleQuestions.reduce((sum, q) => sum + (q.points_eq1 ?? 0), 0)
+    const totalEq2 = finaleQuestions.reduce((sum, q) => sum + (q.points_eq2 ?? 0), 0)
+    await supabase.from('famille_or_sessions').update({
+      equipe1_score: (session.equipe1_score ?? 0) + totalEq1,
+      equipe2_score: (session.equipe2_score ?? 0) + totalEq2,
+      status: 'finished',
+    }).eq('id', session.id)
+    setPhase('fin')
   }
 
   const handleReset = async () => {
@@ -915,58 +938,104 @@ export default function FamilleOrAnimateur() {
         {session?.status === 'finale' && (
           <div className="space-y-3">
             <div className="bg-purple-500/20 border border-purple-400 rounded-xl p-3 text-center">
-              <p className="text-purple-300 font-bold text-lg">🏆 FINALE</p>
+              <p className="text-purple-300 font-bold text-lg">🏆 FINALE — Correction</p>
               <p className="text-white/40 text-xs">
-                Rep. {session.equipe1_nom} : {getPlayerName(session.finale_rep_eq1)} · Rep. {session.equipe2_nom} : {getPlayerName(session.finale_rep_eq2)}
+                Rep. {session.equipe1_nom} : {getPlayerName(session.finale_rep_eq1)} ·
+                Rep. {session.equipe2_nom} : {getPlayerName(session.finale_rep_eq2)}
               </p>
+              {(!session.finale_rep1_valide || !session.finale_rep2_valide) && (
+                <p className="text-orange-300 text-xs mt-1 animate-pulse">
+                  ⏳ En attente des réponses des représentants…
+                  {session.finale_rep1_valide && ` ${session.equipe1_nom} ✅`}
+                  {session.finale_rep2_valide && ` ${session.equipe2_nom} ✅`}
+                </p>
+              )}
             </div>
 
-            {finaleQ && (
-              <div className="bg-blue-800/50 border border-white/10 rounded-2xl p-4 space-y-3">
-                <p className="text-xs text-white/40">Q{finaleQ.ordre} · {finaleQ.points} pts</p>
+            {session.finale_rep1_valide && session.finale_rep2_valide && finaleQ && (
+              <div className="bg-blue-800/50 border border-white/10 rounded-2xl p-4 space-y-4">
+                <p className="text-xs text-white/40">Q{finaleQ.ordre}</p>
                 <p className="font-bold">{finaleQ.question}</p>
+
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-white/5 border border-white/10 rounded-xl p-3">
                     <p className="text-xs text-yellow-300/60 mb-1">{session.equipe1_nom}</p>
-                    <p className="font-medium text-sm">{finaleQ.reponse_eq1 ?? <span className="text-white/30 italic">En attente…</span>}</p>
+                    <p className="font-medium text-sm">{finaleQ.reponse_eq1 ?? '—'}</p>
+                    <p className="text-yellow-300 font-bold text-sm mt-1">{finaleQ.points_eq1 > 0 ? `+${finaleQ.points_eq1} pts` : '0 pt'}</p>
                   </div>
                   <div className="bg-white/5 border border-white/10 rounded-xl p-3">
                     <p className="text-xs text-blue-300/60 mb-1">{session.equipe2_nom}</p>
-                    <p className="font-medium text-sm">{finaleQ.reponse_eq2 ?? <span className="text-white/30 italic">En attente…</span>}</p>
+                    <p className="font-medium text-sm">{finaleQ.reponse_eq2 ?? '—'}</p>
+                    <p className="text-blue-300 font-bold text-sm mt-1">{finaleQ.points_eq2 > 0 ? `+${finaleQ.points_eq2} pts` : '0 pt'}</p>
                   </div>
                 </div>
-                {finaleQ.reponse_eq1 && finaleQ.reponse_eq2 && (
-                  <div className="space-y-2">
-                    <p className="text-white/40 text-xs text-center">Qui a la meilleure réponse ?</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={() => handleValiderFinalePoints(finaleQ, 1)}
-                        className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold rounded-xl py-3 transition-all active:scale-95">
-                        ✅ {session.equipe1_nom}
+
+                <div className="space-y-2">
+                  <p className="text-white/40 text-xs uppercase tracking-wide">Tableau — attribuer les points</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <p className="text-xs text-yellow-300 font-semibold text-center">{session.equipe1_nom}</p>
+                    <p className="text-xs text-blue-300 font-semibold text-center">{session.equipe2_nom}</p>
+                  </div>
+                  {(JSON.parse(finaleQ.reponses ?? '[]') as {texte: string, points: number}[]).map((r, i) => (
+                    <div key={i} className="flex items-center justify-between bg-[#ffd700]/10 border border-[#ffd700]/20 rounded-xl px-3 py-2">
+                      <button onClick={() => handleValiderPointsFinaleEq(1, r.texte, r.points)}
+                        className={`text-xs px-2 py-1 rounded-lg font-bold transition-all ${finaleQ.points_eq1 === r.points && finaleReponseEq1 === r.texte ? 'bg-yellow-400 text-black' : 'bg-white/10 text-white/60 hover:bg-yellow-400/30'}`}>
+                        ✓
                       </button>
-                      <button onClick={() => handleValiderFinalePoints(finaleQ, 2)}
-                        className="bg-blue-400 hover:bg-blue-300 text-white font-bold rounded-xl py-3 transition-all active:scale-95">
-                        ✅ {session.equipe2_nom}
+                      <div className="text-center flex-1 px-2">
+                        <span className="text-sm font-medium">{r.texte}</span>
+                        <span className="text-white/40 text-xs ml-2">{r.points} pts</span>
+                      </div>
+                      <button onClick={() => handleValiderPointsFinaleEq(2, r.texte, r.points)}
+                        className={`text-xs px-2 py-1 rounded-lg font-bold transition-all ${finaleQ.points_eq2 === r.points && finaleReponseEq2 === r.texte ? 'bg-blue-400 text-white' : 'bg-white/10 text-white/60 hover:bg-blue-400/30'}`}>
+                        ✓
                       </button>
                     </div>
+                  ))}
+                  <div className="flex items-center justify-between bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
+                    <button onClick={() => handleValiderPointsFinaleEq(1, null, 0)}
+                      className={`text-xs px-2 py-1 rounded-lg font-bold transition-all ${finaleQ.points_eq1 === 0 && finaleReponseEq1 === null ? 'bg-red-400 text-white' : 'bg-white/10 text-white/60 hover:bg-red-400/30'}`}>
+                      ✓
+                    </button>
+                    <span className="text-sm text-red-300 flex-1 text-center">Pas dans le tableau</span>
+                    <button onClick={() => handleValiderPointsFinaleEq(2, null, 0)}
+                      className={`text-xs px-2 py-1 rounded-lg font-bold transition-all ${finaleQ.points_eq2 === 0 && finaleReponseEq2 === null ? 'bg-red-400 text-white' : 'bg-white/10 text-white/60 hover:bg-red-400/30'}`}>
+                      ✓
+                    </button>
                   </div>
-                )}
+                </div>
+
+                <button onClick={handleCloturerQuestion}
+                  className="w-full bg-[#ffd700] hover:bg-yellow-300 text-black font-bold rounded-xl py-3 transition-all active:scale-95">
+                  Clôturer cette question →
+                </button>
               </div>
             )}
 
-            <div className="space-y-2">
-              {finaleQuestions.filter(q => q.status === 'pending').map(fq => (
-                <button key={fq.id} onClick={() => handleLancerQuestionFinale(fq)}
-                  className="w-full bg-white/5 border border-white/10 hover:border-purple-400/50 rounded-xl p-3 text-left text-sm transition-all active:scale-95">
-                  Q{fq.ordre} ({fq.points} pts) — {fq.question}
-                </button>
-              ))}
-              {finaleQuestions.length > 0 && finaleQuestions.every(q => q.status === 'closed') && (
-                <button onClick={handleTerminer}
+            {finaleQuestions.length > 0 && finaleQuestions.every(q => q.status === 'closed') && (
+              <div className="space-y-3">
+                <p className="text-white/40 text-xs uppercase tracking-wide text-center">Récap finale</p>
+                {finaleQuestions.map(fq => (
+                  <div key={fq.id} className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-2">
+                    <p className="text-sm font-bold">{fq.question}</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-yellow-300">{session.equipe1_nom} : </span>
+                        <span>{fq.reponse_eq1 ?? '—'} ({fq.points_eq1} pts)</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-300">{session.equipe2_nom} : </span>
+                        <span>{fq.reponse_eq2 ?? '—'} ({fq.points_eq2} pts)</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button onClick={handleClassementFinale}
                   className="w-full bg-[#ffd700] hover:bg-yellow-300 text-black font-bold rounded-xl py-4 transition-all active:scale-95">
-                  🏁 Terminer le jeu !
+                  🏆 Afficher le classement final !
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
 
