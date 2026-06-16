@@ -934,7 +934,6 @@ export default function FamilleOrAnimateur() {
               <div className="bg-blue-800/50 border border-white/10 rounded-2xl p-4 space-y-4">
                 <p className="text-xs text-white/40">Q{finaleQ.ordre}</p>
                 <p className="font-bold">{finaleQ.question}</p>
-
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-white/5 border border-white/10 rounded-xl p-3">
                     <p className="text-xs text-yellow-300/60 mb-1">{session.equipe1_nom}</p>
@@ -947,17 +946,16 @@ export default function FamilleOrAnimateur() {
                     <p className="text-blue-300 font-bold text-sm mt-1">{finaleQ.points_eq2 > 0 ? `+${finaleQ.points_eq2} pts` : '0 pt'}</p>
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <p className="text-white/40 text-xs uppercase tracking-wide">Tableau — attribuer les points</p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2 mb-1">
                     <p className="text-xs text-yellow-300 font-semibold text-center">{session.equipe1_nom}</p>
                     <p className="text-xs text-blue-300 font-semibold text-center">{session.equipe2_nom}</p>
                   </div>
                   {(JSON.parse(finaleQ.reponses ?? '[]') as {texte: string, points: number}[]).map((r, i) => (
                     <div key={i} className="flex items-center justify-between bg-[#ffd700]/10 border border-[#ffd700]/20 rounded-xl px-3 py-2">
                       <button onClick={() => handleValiderPointsFinaleEq(1, r.texte, r.points)}
-                        className={`text-xs px-2 py-1 rounded-lg font-bold transition-all ${finaleQ.points_eq1 === r.points && finaleReponseEq1 === r.texte ? 'bg-yellow-400 text-black' : 'bg-white/10 text-white/60 hover:bg-yellow-400/30'}`}>
+                        className={`text-xs px-2 py-1 rounded-lg font-bold transition-all ${finaleQ.points_eq1 === r.points ? 'bg-yellow-400 text-black' : 'bg-white/10 text-white/60 hover:bg-yellow-400/30'}`}>
                         ✓
                       </button>
                       <div className="text-center flex-1 px-2">
@@ -965,24 +963,23 @@ export default function FamilleOrAnimateur() {
                         <span className="text-white/40 text-xs ml-2">{r.points} pts</span>
                       </div>
                       <button onClick={() => handleValiderPointsFinaleEq(2, r.texte, r.points)}
-                        className={`text-xs px-2 py-1 rounded-lg font-bold transition-all ${finaleQ.points_eq2 === r.points && finaleReponseEq2 === r.texte ? 'bg-blue-400 text-white' : 'bg-white/10 text-white/60 hover:bg-blue-400/30'}`}>
+                        className={`text-xs px-2 py-1 rounded-lg font-bold transition-all ${finaleQ.points_eq2 === r.points ? 'bg-blue-400 text-white' : 'bg-white/10 text-white/60 hover:bg-blue-400/30'}`}>
                         ✓
                       </button>
                     </div>
                   ))}
                   <div className="flex items-center justify-between bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
                     <button onClick={() => handleValiderPointsFinaleEq(1, null, 0)}
-                      className={`text-xs px-2 py-1 rounded-lg font-bold transition-all ${finaleQ.points_eq1 === 0 && finaleReponseEq1 === null ? 'bg-red-400 text-white' : 'bg-white/10 text-white/60 hover:bg-red-400/30'}`}>
+                      className={`text-xs px-2 py-1 rounded-lg font-bold transition-all ${finaleQ.points_eq1 === 0 ? 'bg-red-400 text-white' : 'bg-white/10 text-white/60 hover:bg-red-400/30'}`}>
                       ✓
                     </button>
                     <span className="text-sm text-red-300 flex-1 text-center">Pas dans le tableau</span>
                     <button onClick={() => handleValiderPointsFinaleEq(2, null, 0)}
-                      className={`text-xs px-2 py-1 rounded-lg font-bold transition-all ${finaleQ.points_eq2 === 0 && finaleReponseEq2 === null ? 'bg-red-400 text-white' : 'bg-white/10 text-white/60 hover:bg-red-400/30'}`}>
+                      className={`text-xs px-2 py-1 rounded-lg font-bold transition-all ${finaleQ.points_eq2 === 0 ? 'bg-red-400 text-white' : 'bg-white/10 text-white/60 hover:bg-red-400/30'}`}>
                       ✓
                     </button>
                   </div>
                 </div>
-
                 <button onClick={handleCloturerQuestion}
                   className="w-full bg-[#ffd700] hover:bg-yellow-300 text-black font-bold rounded-xl py-3 transition-all active:scale-95">
                   Clôturer cette question →
