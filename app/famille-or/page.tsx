@@ -15,6 +15,13 @@ type Session = {
   equipe1_score: number
   equipe2_score: number
   status: string
+  finale_rep_eq1: string | null
+  finale_rep_eq2: string | null
+}
+type FinaleQuestion = {
+  id: string; ordre: number; question: string
+  reponse_eq1: string | null; reponse_eq2: string | null
+  points: number; status: string
 }
 type Question = {
   id: string
@@ -53,6 +60,9 @@ export default function FamilleOrJoueurs() {
   const [loading, setLoading]       = useState(true)
   const [joined, setJoined]         = useState(false)
   const [buzzed, setBuzzed]         = useState(false)
+  const [finaleQ, setFinaleQ]       = useState<FinaleQuestion | null>(null)
+  const [finaleReponse, setFinaleReponse] = useState('')
+  const [finaleSent, setFinaleSent] = useState(false)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
@@ -80,6 +90,17 @@ export default function FamilleOrJoueurs() {
 
       if (sess) {
         setSession(sess)
+        if (sess.status === 'finale') {
+          const { data: fq } = await supabase
+            .from('famille_or_finale').select('*')
+            .eq('session_id', sess.id).eq('status', 'active').maybeSingle()
+          setFinaleQ(prev => {
+            if (fq?.id !== prev?.id) setFinaleSent(false)
+            return fq
+          })
+          setLoading(false)
+          return
+        }
         const { data: q } = await supabase
           .from('famille_or_questions').select('*')
           .eq('session_id', sess.id).eq('status', 'active').maybeSingle()
@@ -117,6 +138,15 @@ export default function FamilleOrJoueurs() {
       setMyPlayer({ id: data.id, name: prenom.trim(), equipe: null })
       setJoined(true)
     }
+  }
+
+  const handleEnvoyerReponseFinale = async () => {
+    if (!finaleQ || !myPlayer || !session || finaleSent) return
+    const isEq1 = myPlayer.id === session.finale_rep_eq1
+    const field = isEq1 ? 'reponse_eq1' : 'reponse_eq2'
+    await supabase.from('famille_or_finale').update({ [field]: finaleReponse }).eq('id', finaleQ.id)
+    setFinaleSent(true)
+    setFinaleReponse('')
   }
 
   const handleBuzz = async () => {
@@ -182,6 +212,60 @@ export default function FamilleOrJoueurs() {
             Rejoindre →
           </button>
         </div>
+      </main>
+    )
+  }
+
+  // ── Finale ────────────────────────────────────────────────
+  if (session?.status === 'finale' && finaleQ) {
+    const isRep = myPlayer && (session.finale_rep_eq1 === myPlayer.id || session.finale_rep_eq2 === myPlayer.id)
+    return (
+      <main className="min-h-screen bg-[#1a237e] text-white p-6 flex flex-col items-center justify-center">
+        <div className="w-full max-w-sm space-y-5">
+          <div className="text-center">
+            <div className="text-5xl mb-2">🏆</div>
+            <p className="text-purple-300 font-bold text-lg">FINALE — Q{finaleQ.ordre}</p>
+            <p className="text-white/40 text-xs">{finaleQ.points} points</p>
+          </div>
+          <div className="bg-blue-800/50 border border-white/10 rounded-2xl p-4 text-center">
+            <p className="font-bold text-lg leading-snug">{finaleQ.question}</p>
+          </div>
+          {isRep ? (
+            finaleSent ? (
+              <div className="text-center space-y-2">
+                <div className="text-4xl">✅</div>
+                <p className="text-green-300 font-bold">Réponse envoyée !</p>
+                <p className="text-white/40 text-sm">En attente de l&apos;autre équipe…</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <input value={finaleReponse} onChange={e => setFinaleReponse(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleEnvoyerReponseFinale()}
+                  placeholder="Ta réponse…"
+                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-center text-lg outline-none focus:border-purple-400 transition-colors"
+                  autoFocus />
+                <button onClick={handleEnvoyerReponseFinale} disabled={!finaleReponse.trim()}
+                  className="w-full bg-purple-500 hover:bg-purple-400 text-white font-bold rounded-xl py-3 disabled:opacity-30 transition-all active:scale-95">
+                  Envoyer →
+                </button>
+              </div>
+            )
+          ) : (
+            <div className="text-center text-white/40">
+              <p>Tu es spectateur pour cette question</p>
+            </div>
+          )}
+        </div>
+      </main>
+    )
+  }
+
+  if (session?.status === 'finale' && !finaleQ) {
+    return (
+      <main className="min-h-screen bg-[#1a237e] flex flex-col items-center justify-center p-6 text-white text-center">
+        <div className="text-5xl mb-4">🏆</div>
+        <p className="text-purple-300 font-bold text-xl">FINALE</p>
+        <p className="text-white/50 mt-2">En attente de la prochaine question…</p>
       </main>
     )
   }
