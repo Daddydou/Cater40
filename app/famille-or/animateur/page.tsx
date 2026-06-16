@@ -36,9 +36,6 @@ type FinaleQuestion = {
 const defaultFinaleQuestions = [
   { ordre: 1, question: "Citez quelque chose qu'on fait toujours en dernier minute", points: 30 },
   { ordre: 2, question: "Citez un mot qu'on écrit souvent mal", points: 25 },
-  { ordre: 3, question: "Citez quelque chose qu'on oublie toujours de faire", points: 25 },
-  { ordre: 4, question: "Citez une chose qu'on fait en cachette au travail", points: 20 },
-  { ordre: 5, question: "Citez quelque chose qu'on dit mais qu'on ne fait jamais", points: 20 },
 ]
 type Question = {
   id: string
