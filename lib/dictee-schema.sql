@@ -23,6 +23,9 @@ CREATE TABLE dictee_copies (
   created_at timestamp DEFAULT now()
 );
 
+-- Migration : colonne pour synchroniser la révélation spectateur
+ALTER TABLE dictee_sessions ADD COLUMN IF NOT EXISTS reveal_count INT DEFAULT 0;
+
 -- RLS
 ALTER TABLE dictee_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE dictee_copies ENABLE ROW LEVEL SECURITY;

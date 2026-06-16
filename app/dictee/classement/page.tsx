@@ -21,7 +21,8 @@ function ClassementContent() {
   const [showMessage, setShowMessage]     = useState(false)
   const [loading, setLoading]             = useState(true)
   const [roomId, setRoomId]               = useState<string | null>(null)
-  const roomIdRef = useRef<string | null>(null)
+  const roomIdRef    = useRef<string | null>(null)
+  const sessionIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -34,47 +35,74 @@ function ClassementContent() {
       roomIdRef.current = room.id
       setRoomId(room.id)
 
-      const { data } = await supabase
-        .from('players')
-        .select('id, name, score, avatar_url')
-        .eq('room_id', room.id)
-        .order('score', { ascending: true })
-      if (data) {
-        setPlayers(data)
-        if (!isAnimateur) setRevealedCount(data.length)
+      const [{ data: playersData }, { data: session }] = await Promise.all([
+        supabase
+          .from('players')
+          .select('id, name, score, avatar_url')
+          .eq('room_id', room.id)
+          .order('score', { ascending: true }),
+        supabase
+          .from('dictee_sessions')
+          .select('id, reveal_count')
+          .eq('room_id', room.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ])
+
+      if (playersData) setPlayers(playersData)
+      if (session) {
+        sessionIdRef.current = session.id
+        setRevealedCount(session.reveal_count ?? 0)
       }
       setLoading(false)
     }
     load()
-  }, [isAnimateur])
+  }, [])
 
-  // Spectateur : polling toutes les 2s
+  // Spectateur : polling toutes les 2s sur dictee_sessions.reveal_count + players
   useEffect(() => {
     if (isAnimateur || !roomId) return
     const interval = setInterval(async () => {
-      const { data } = await supabase
+      const { data: session } = await supabase
+        .from('dictee_sessions')
+        .select('id, reveal_count')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!session) return
+      sessionIdRef.current = session.id
+      const count = session.reveal_count ?? 0
+      setRevealedCount(count)
+
+      const { data: playersData } = await supabase
         .from('players')
         .select('id, name, score, avatar_url')
         .eq('room_id', roomId)
         .order('score', { ascending: true })
-      if (data) {
-        setPlayers(data)
-        setRevealedCount(data.length)
-      }
+      if (playersData) setPlayers(playersData)
     }, 2000)
     return () => clearInterval(interval)
   }, [isAnimateur, roomId])
 
-  const handleNext = () => {
+  const handleNext = async () => {
     const next = revealedCount + 1
     setRevealedCount(next)
+    if (sessionIdRef.current) {
+      await supabase.from('dictee_sessions').update({ reveal_count: next }).eq('id', sessionIdRef.current)
+    }
     if (next >= players.length) {
       setTimeout(() => { setShowConfetti(true); setShowMessage(true) }, 600)
     }
   }
 
-  const handleRevealAll = () => {
+  const handleRevealAll = async () => {
     setRevealedCount(players.length)
+    if (sessionIdRef.current) {
+      await supabase.from('dictee_sessions').update({ reveal_count: players.length }).eq('id', sessionIdRef.current)
+    }
     setTimeout(() => { setShowConfetti(true); setShowMessage(true) }, 600)
   }
 
@@ -97,8 +125,7 @@ function ClassementContent() {
     )
   }
 
-  // displayOrder : meilleur en haut (index 0), moins bon en bas (index N-1)
-  // Révélation du bas vers le haut : pire d'abord, meilleur en dernier
+  // displayOrder : meilleur en haut (index 0), révélation du bas vers le haut
   const displayOrder = [...players].reverse()
 
   return (
