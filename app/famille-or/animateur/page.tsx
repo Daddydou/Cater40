@@ -59,20 +59,6 @@ type Reponse = {
   revealed: boolean
 }
 
-function playSound(type: 'ding' | 'buzzer' | 'fanfare' | 'victoire' | 'buzz') {
-  try {
-    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain); gain.connect(ctx.destination)
-    if (type === 'ding')    { osc.frequency.value = 880; gain.gain.setValueAtTime(0.3, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3) }
-    if (type === 'buzzer')  { osc.frequency.value = 120; osc.type = 'sawtooth'; gain.gain.setValueAtTime(0.4, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4) }
-    if (type === 'fanfare') { osc.frequency.value = 660; gain.gain.setValueAtTime(0.3, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6) }
-    if (type === 'victoire'){ osc.frequency.value = 523; gain.gain.setValueAtTime(0.3, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1) }
-    if (type === 'buzz')    { osc.frequency.value = 440; osc.type = 'square'; gain.gain.setValueAtTime(0.5, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2) }
-    osc.start(); osc.stop(ctx.currentTime + 1)
-  } catch {}
-}
 
 export default function FamilleOrAnimateur() {
   const [phase, setPhase] = useState<'inscription' | 'equipes' | 'jeu' | 'fin'>('inscription')
@@ -115,7 +101,6 @@ export default function FamilleOrAnimateur() {
       .eq('session_id', sessionId).eq('status', 'active').maybeSingle()
     if (q && q.buzzer_winner_id && q.buzzer_winner_id !== prevBuzzerId.current) {
       prevBuzzerId.current = q.buzzer_winner_id
-      playSound('buzz')
     }
     setQuestion(q)
     if (q) {
@@ -340,11 +325,9 @@ export default function FamilleOrAnimateur() {
       if (isTopReponse) {
         const equipe = question.representant_eq1 === question.buzzer_winner_id ? 1 : 2
         await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
-        playSound('ding')
         await supabase.from('famille_or_questions').update({ phase: 'normal', equipe_active: equipe }).eq('id', question.id)
       } else {
         await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
-        playSound('ding')
         await supabase.from('famille_or_questions').update({ phase: 'buzzer_adverse' }).eq('id', question.id)
       }
     } else if (currentPhase === 'buzzer_adverse') {
@@ -353,7 +336,6 @@ export default function FamilleOrAnimateur() {
       const revealedRep = reponses.find(rep => rep.revealed)
       const adverseBetter = revealedRep ? r.ordre < revealedRep.ordre : false
       await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
-      playSound('ding')
       await supabase.from('famille_or_questions').update({
         phase: 'normal',
         equipe_active: isTopReponse ? equipeAdverse : (adverseBetter ? equipeAdverse : equipeWinner),
@@ -379,7 +361,6 @@ export default function FamilleOrAnimateur() {
   const handleReveler = async (r: Reponse) => {
     if (!question || !session) return
     await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
-    playSound('ding')
     const { data: reps } = await supabase
       .from('famille_or_reponses').select('*')
       .eq('question_id', question.id).order('ordre')
@@ -391,7 +372,6 @@ export default function FamilleOrAnimateur() {
     const croixField = question.equipe_active === 1 ? 'croix_equipe1' : 'croix_equipe2'
     const currentCroix = question.equipe_active === 1 ? question.croix_equipe1 : question.croix_equipe2
     const newCroix = currentCroix + 1
-    playSound('buzzer')
     if (newCroix >= 3) {
       const autreEquipe = question.equipe_active === 1 ? 2 : 1
       await supabase.from('famille_or_questions').update({
@@ -407,7 +387,6 @@ export default function FamilleOrAnimateur() {
 
   const handleVolReussi = async () => {
     if (!question || !session) return
-    playSound('fanfare')
     const nonReveleees = reponses.filter(r => !r.revealed)
     for (const r of nonReveleees) {
       await supabase.from('famille_or_reponses').update({ revealed: true }).eq('id', r.id)
@@ -460,7 +439,6 @@ export default function FamilleOrAnimateur() {
 
   const handleTerminer = async () => {
     if (!session || !roomId) return
-    playSound('victoire')
     await supabase.from('famille_or_sessions').update({ status: 'finished' }).eq('id', session.id)
     await supabase.from('rooms').update({ status: 'finished' }).eq('id', roomId)
     setPhase('fin')
