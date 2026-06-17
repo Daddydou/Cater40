@@ -456,7 +456,7 @@ export default function CitationsPerduesPage() {
         <h1 className="text-base font-bold text-yellow-400 tracking-widest uppercase">🎭 Citations Perdues</h1>
         <div className="flex items-center gap-3">
           <span className="text-xs text-gray-600" style={{ fontFamily: 'sans-serif' }}>{nbValidees}/{PHRASES.length}</span>
-          <button onClick={resetGame} className="text-xs text-gray-700 hover:text-red-500 transition-colors tracking-wide">Réinitialiser</button>
+          <button onClick={resetGame} className="bg-red-950 border border-red-800 hover:bg-red-900 text-red-400 font-bold text-xs px-4 py-2 rounded-xl transition-colors active:scale-95">🔄 Reset</button>
         </div>
       </div>
       <div className="px-4 py-6 max-w-2xl mx-auto space-y-8">
