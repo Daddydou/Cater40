@@ -131,8 +131,12 @@ export default function CitationsPerduesPage() {
         setPhase(2);
         setDragLetters(buildPhase2Letters(s.lettres_colorees_revelees || [], s.hint_index || 0));
       }
+      setLoading(false);
+    } else {
+      await createSession();
+      setLoading(false);
     }
-    setLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { fetchSession(); }, [fetchSession]);
@@ -140,13 +144,14 @@ export default function CitationsPerduesPage() {
   const createSession = async () => {
     const fresh = {
       points: 0,
-      phrases_validees: Array(PHRASES.length).fill(false),
+      phrases_validees: Array(14).fill(false) as boolean[],
       lettres_par_phrase: {},
       lettres_colorees_revelees: [],
       phase2_debloquee: false,
       hint_index: 0,
     };
-    const { data } = await supabase.from('citations_game').insert(fresh).select().single();
+    const { data, error } = await supabase.from('citations_game').insert(fresh).select().single();
+    if (error) console.error('createSession error:', error);
     if (data) {
       setSession(data as GameSession);
       setPointsInput('0');
@@ -327,19 +332,7 @@ export default function CitationsPerduesPage() {
   }
 
   if (!session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4">
-        <div className="text-center space-y-6">
-          <div className="text-6xl select-none">🎭</div>
-          <h1 className="text-3xl font-bold text-yellow-400 tracking-wide" style={{ fontFamily: 'Georgia, serif' }}>
-            Citations Perdues
-          </h1>
-          <button onClick={createSession} className="bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-black px-10 py-4 rounded-2xl text-lg transition-colors">
-            Nouvelle partie
-          </button>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (showFete) {
