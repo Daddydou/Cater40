@@ -53,7 +53,7 @@ interface GameSession {
   id: string;
   points: number;
   phrases_validees: boolean[];
-  lettres_par_phrase: Record<number, string[]>;
+  lettres_achetees: string[];
   lettres_colorees_revelees: string[];
   phase2_debloquee: boolean;
   hint_index: number;
@@ -145,7 +145,7 @@ export default function CitationsPerduesPage() {
     const fresh = {
       points: 0,
       phrases_validees: Array(14).fill(false) as boolean[],
-      lettres_par_phrase: {},
+      lettres_achetees: [],
       lettres_colorees_revelees: [],
       phase2_debloquee: false,
       hint_index: 0,
@@ -165,25 +165,21 @@ export default function CitationsPerduesPage() {
     errorTimer.current = setTimeout(() => setErrorMsg(''), 2800);
   };
 
-  const buyLetter = async (letter: string, phraseIdx: number) => {
+  const buyLetter = async (letter: string) => {
     if (!session) return;
-    const already = (session.lettres_par_phrase[phraseIdx] || []).includes(letter);
-    if (already) return;
+    if (session.lettres_achetees.includes(letter)) return;
     const cost = LETTER_VALUES[letter];
     if (session.points < cost) {
       showError(`Pas assez de points — il faut ${cost} pts pour « ${letter} »`);
       return;
     }
-    const newLettresParPhrase: Record<number, string[]> = {
-      ...session.lettres_par_phrase,
-      [phraseIdx]: [...(session.lettres_par_phrase[phraseIdx] || []), letter],
-    };
+    const newLettres = [...session.lettres_achetees, letter];
     const newPoints = session.points - cost;
     let newColorees = [...(session.lettres_colorees_revelees || [])];
     if (COLORED_LETTERS[letter] && !newColorees.includes(letter)) {
       newColorees = [...newColorees, letter];
     }
-    const updated = { points: newPoints, lettres_par_phrase: newLettresParPhrase, lettres_colorees_revelees: newColorees };
+    const updated = { points: newPoints, lettres_achetees: newLettres, lettres_colorees_revelees: newColorees };
     setSession(prev => prev ? { ...prev, ...updated } : prev);
     setPointsInput(String(newPoints));
     await supabase.from('citations_game').update(updated).eq('id', session.id);
@@ -233,7 +229,7 @@ export default function CitationsPerduesPage() {
     const fresh = {
       points: 0,
       phrases_validees: Array(PHRASES.length).fill(false),
-      lettres_par_phrase: {},
+      lettres_achetees: [],
       lettres_colorees_revelees: [],
       phase2_debloquee: false,
       hint_index: 0,
@@ -247,7 +243,7 @@ export default function CitationsPerduesPage() {
   };
 
   const renderPhrase = (phrase: string, phraseIdx: number) => {
-    const achetees = session?.lettres_par_phrase?.[phraseIdx] || [];
+    const achetees = session?.lettres_achetees || [];
     const validee = session?.phrases_validees?.[phraseIdx] ?? false;
     return phrase.split('').map((char, i) => {
       if (char === ' ') return <span key={i} className="inline-block w-3" />;
@@ -485,7 +481,6 @@ export default function CitationsPerduesPage() {
             const validee = validees[idx];
             const isBravo = bravoPhrase === idx;
             const isSelected = selectedPhraseIdx === idx;
-            const achetees = session.lettres_par_phrase?.[idx] || [];
             return (
               <div key={idx} className={`rounded-2xl px-4 py-4 space-y-3 border transition-all duration-300 ${isBravo ? 'bg-green-900/60 border-green-500 scale-[1.01]' : validee ? 'bg-green-950/40 border-green-800' : isSelected ? 'bg-gray-800/80 border-yellow-600' : 'bg-gray-900/60 border-gray-800'}`}>
                 <div
@@ -497,11 +492,6 @@ export default function CitationsPerduesPage() {
                 </div>
                 {isBravo && (
                   <div className="text-center text-green-400 font-black text-lg animate-bounce tracking-widest">✨ Bravo Cater ! ✨</div>
-                )}
-                {!validee && (
-                  <div className="text-xs text-gray-700 tracking-wide" style={{ fontFamily: 'sans-serif' }}>
-                    Lettres révélées : {achetees.length > 0 ? achetees.sort().join(', ') : 'aucune'}
-                  </div>
                 )}
                 {isSelected && !validee && (
                   <div className="space-y-2 pt-1">
@@ -521,35 +511,30 @@ export default function CitationsPerduesPage() {
                     </div>
                   </div>
                 )}
-                {!validee && (
-                  <details className="group">
-                    <summary className="text-xs text-gray-600 hover:text-gray-400 cursor-pointer select-none tracking-widest" style={{ fontFamily: 'sans-serif' }}>
-                      🔤 Acheter une lettre pour cette citation
-                    </summary>
-                    <div className="grid grid-cols-9 gap-1 mt-2">
-                      {ALPHABET.map(letter => {
-                        const bought = achetees.includes(letter);
-                        const cost = LETTER_VALUES[letter];
-                        const color = COLORED_LETTERS[letter];
-                        return (
-                          <button
-                            key={letter}
-                            onClick={() => buyLetter(letter, idx)}
-                            disabled={bought}
-                            title={`${letter} — ${cost} pts`}
-                            className={`flex flex-col items-center justify-center rounded-lg py-1.5 border transition-all text-[11px] ${bought ? 'bg-gray-900/20 border-gray-900 cursor-not-allowed' : 'bg-gray-800/80 border-gray-700 hover:border-yellow-500 active:scale-95 cursor-pointer'}`}
-                          >
-                            <span className="font-black leading-none" style={{ color: bought ? '#374151' : color || 'white', textShadow: bought || !color ? 'none' : `0 0 6px ${color}88` }}>{letter}</span>
-                            <span className={`text-[8px] mt-0.5 ${bought ? 'text-gray-800' : 'text-yellow-600'}`}>{cost}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </details>
-                )}
               </div>
             );
           })}
+        </div>
+        <div className="bg-gray-900/60 border border-gray-800 rounded-2xl px-5 py-4 space-y-3">
+          <p className="text-xs text-gray-600 uppercase tracking-widest" style={{ fontFamily: 'sans-serif' }}>Acheter une lettre</p>
+          <div className="grid grid-cols-9 gap-1">
+            {ALPHABET.map(letter => {
+              const bought = (session.lettres_achetees || []).includes(letter);
+              const cost = LETTER_VALUES[letter];
+              return (
+                <button
+                  key={letter}
+                  onClick={() => buyLetter(letter)}
+                  disabled={bought}
+                  title={`${letter} — ${cost} pts`}
+                  className={`flex flex-col items-center justify-center rounded-lg py-1.5 border transition-all text-[11px] ${bought ? 'bg-gray-900/20 border-gray-900 cursor-not-allowed' : 'bg-gray-800/80 border-gray-700 hover:border-yellow-500 active:scale-95 cursor-pointer'}`}
+                >
+                  <span className="font-black leading-none" style={{ color: bought ? '#374151' : 'white' }}>{letter}</span>
+                  <span className={`text-[8px] mt-0.5 ${bought ? 'text-gray-800' : 'text-yellow-600'}`}>{cost}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         {(session.lettres_colorees_revelees?.length || 0) > 0 && (
           <div className="bg-gray-900/40 border border-gray-800 rounded-2xl px-5 py-4 space-y-2">
