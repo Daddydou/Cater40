@@ -25,18 +25,6 @@ const COLORED_LETTERS: Record<string, string> = {
 const PHRASES = [
   "La vie est belle",
   "Je pense donc je suis",
-  "L'amour est aveugle",
-  "Le temps c'est de l'argent",
-  "Qui vivra verra",
-  "La nuit porte conseil",
-  "Vouloir c'est pouvoir",
-  "Il faut cultiver notre jardin",
-  "Les absents ont toujours tort",
-  "Mieux vaut tard que jamais",
-  "La fortune sourit aux audacieux",
-  "L'union fait la force",
-  "Chaque jour suffit sa peine",
-  "Bien mal acquis ne profite jamais",
 ];
 
 const HINT_BATCHES = [
