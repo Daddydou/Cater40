@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase'
 const ROOM_CODE = 'dictee'
 
 const TEXTE_DICTEE =
-  'Les orthophonistes travaillent quotidiennement avec des patients qui présentent des troubles du langage. Ils évaluent, diagnostiquent et traitent ces difficultés avec patience et bienveillance. Chaque séance est une opportunité de progresser ensemble vers une meilleure communication.'
+  "À vélo\n\nQu'un cyclone se lève ou qu'une canicule s'abatte, l'adepte du V.T.T. a une pêche d'enfer. Rien ne saurait l'arrêter. Le faciès comprimé sous un casque antichoc, il enfouche son vélo, et hop ! Le voilà dans les sous-bois. Il évite en zigzaguant des nids-de-poule, roule en cahotant sur des sentiers bosselés et s'éclate dans les clairières. Infatigable, il dévale des pentes verglacées, puis, son parcours du combattant achevé, il met pied à terre, flapi, crotté, courbatu, mais content."
 
 type SessionStatus = 'waiting' | 'writing' | 'correcting' | 'scoring' | 'finished'
 type Phase = 'loading' | 'ready' | 'writing' | 'correcting' | 'scoring' | 'finished'
