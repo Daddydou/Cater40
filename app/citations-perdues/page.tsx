@@ -23,8 +23,20 @@ const COLORED_LETTERS: Record<string, string> = {
 };
 
 const PHRASES = [
-  "La vie est belle",
-  "Je pense donc je suis",
+  "Merci Beu pour cette couille du matin",
+  "Est troublée par un ressenti",
+  "Vous n'aurez pas la médaille cochon",
+  "Les taxis parisiens bonjours",
+  "D'abord parce que les gens font ce qu'ils veulent",
+  "Ta !",
+  "Euh c'est normal le Noir dans la piscine ?",
+  "Notre couple aura vraiment surpris tout le monde ahahaha",
+  "Ok let's go for jaquot",
+  "Bah ? Et mon cul ?",
+  "Mémé fait le vessel",
+  "Alors t'as fait quoi de beau aujourd'hui ?",
+  "Des baskets gratos !",
+  "Mais on va finir tout nus !",
 ];
 
 const HINT_BATCHES = [
