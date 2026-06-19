@@ -7,12 +7,13 @@
 // Le QR code se génère automatiquement.
 // ─────────────────────────────────────────────────────────────────────────────
 const JEUX_MULTI = [
+  { nom: 'Hub Cater 🎂',     url: 'https://cater40.vercel.app' },
+  { nom: 'Hub Joueurs 🎉',   url: 'https://cater40.vercel.app/joueurs' },
   { nom: 'Concours Ortho',  url: 'https://cater40.vercel.app/concours-ortho' },
   { nom: 'Dictée',          url: 'https://cater40.vercel.app/dictee' },
   { nom: 'Famille en or',   url: 'https://cater40.vercel.app/famille-or' },
   { nom: 'Une Cater en or', url: 'https://cater40.vercel.app/cater-en-or/joueurs' },
   { nom: 'Quizz Friends',   url: 'https://cater40.vercel.app/quizz-friends' },
-  // 👉 Pour ajouter un jeu : copie une ligne ci-dessus, change nom + url. Le QR se génère automatiquement.
 ]
 
 import { useEffect, useState } from 'react'
