@@ -12,8 +12,17 @@ const JEUX = [
   { num: 6, nom: 'Une Cater en or',  emoji: '🎯', code: 'cater-en-or',     href: '/cater-en-or/animateur' },
   { num: 7, nom: 'Photos Gens',      emoji: '📸', code: 'photos-gens',     href: '/photos-gens/animateur' },
   { num: 8, nom: 'Citations Perdues',emoji: '💬', code: null,              href: '/citations-perdues' },
-  { num: 9, nom: 'Quizz Friends',   emoji: '🛋️', code: 'quizz-friends',   href: '/quizz-friends/animateur' },
+  { num: 9, nom: 'Quizz Friends',    emoji: '🛋️', code: 'quizz-friends',   href: '/quizz-friends/animateur' },
 ] as const
+
+const JEUX_REVELABLES = [
+  { slug: 'quizz-friends',     nom: 'Quizz Friends',    emoji: '📺' },
+  { slug: 'jeu-bras',          nom: 'Jeu des bras',      emoji: '💪' },
+  { slug: 'dictee',            nom: 'Dictée',            emoji: '✏️' },
+  { slug: 'citations-perdues', nom: 'Citations Perdues', emoji: '🎭' },
+  { slug: 'concours-ortho',    nom: 'Concours Ortho',    emoji: '📝' },
+  { slug: 'famille-or',        nom: 'Famille en Or',     emoji: '🏆' },
+]
 
 const ROOM_CODES = JEUX.flatMap(j => j.code ? [j.code] : [])
 
@@ -37,8 +46,10 @@ function StatusBadge({ status }: { status?: string }) {
 }
 
 export default function HubAnimateur() {
-  const [statuses, setStatuses]   = useState<Record<string, string>>({})
-  const [resetting, setResetting] = useState<string | null>(null)
+  const [statuses, setStatuses]       = useState<Record<string, string>>({})
+  const [resetting, setResetting]     = useState<string | null>(null)
+  const [jeuxVisibles, setJeuxVisibles] = useState<Record<string, boolean>>({})
+  const [revealing, setRevealing]     = useState<string | null>(null)
   const initialized = useRef(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -54,15 +65,40 @@ export default function HubAnimateur() {
     }
   }
 
+  const fetchJeuxVisibles = async () => {
+    const { data } = await supabase
+      .from('jeux_visibles')
+      .select('slug, visible')
+    if (data) {
+      const map: Record<string, boolean> = {}
+      for (const row of data) map[row.slug] = row.visible
+      setJeuxVisibles(map)
+    }
+  }
+
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
     fetchStatuses()
-    intervalRef.current = setInterval(fetchStatuses, 5000)
+    fetchJeuxVisibles()
+    intervalRef.current = setInterval(() => {
+      fetchStatuses()
+      fetchJeuxVisibles()
+    }, 3000)
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [])
+
+  const handleReveler = async (slug: string) => {
+    setRevealing(slug)
+    await supabase
+      .from('jeux_visibles')
+      .update({ visible: true })
+      .eq('slug', slug)
+    await fetchJeuxVisibles()
+    setRevealing(null)
+  }
 
   const handleResetAll = async () => {
     if (!confirm('Réinitialiser TOUS les jeux ? Tous les joueurs et scores seront supprimés.')) return
@@ -102,6 +138,33 @@ export default function HubAnimateur() {
           <p className="text-white/40 text-sm mt-1">Vue d&apos;ensemble et accès rapide</p>
         </div>
 
+        {/* Révélation progressive des jeux */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6">
+          <h2 className="text-sm font-bold text-white/70 mb-3">🎉 Révéler les jeux</h2>
+          <div className="space-y-2">
+            {JEUX_REVELABLES.map(jeu => {
+              const visible = jeuxVisibles[jeu.slug]
+              return (
+                <div key={jeu.slug} className="flex items-center gap-3">
+                  <span className="text-xl w-8 text-center">{jeu.emoji}</span>
+                  <span className="flex-1 text-sm font-medium">{jeu.nom}</span>
+                  {visible ? (
+                    <span className="text-xs text-white/30 font-semibold">✅ Révélé</span>
+                  ) : (
+                    <button
+                      onClick={() => handleReveler(jeu.slug)}
+                      disabled={revealing === jeu.slug}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/30 transition-all active:scale-95 disabled:opacity-40"
+                    >
+                      {revealing === jeu.slug ? '…' : 'Révéler 🎉'}
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
         <button
           onClick={handleResetAll}
           className="w-full bg-red-500/20 hover:bg-red-500/40 border border-red-500/40 text-red-300 font-bold rounded-xl py-4 transition-all active:scale-95 mb-6"
@@ -113,7 +176,6 @@ export default function HubAnimateur() {
           {JEUX.map(jeu => (
             <div key={jeu.num} className="bg-white/5 border border-white/10 rounded-2xl p-4">
 
-              {/* En-tête de la card */}
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-2xl w-9 text-center">{jeu.emoji}</span>
                 <div className="flex-1">
@@ -125,7 +187,6 @@ export default function HubAnimateur() {
                 <StatusBadge status={jeu.code ? statuses[jeu.code] : undefined} />
               </div>
 
-              {/* Actions */}
               <div className="flex gap-2">
                 <a
                   href={jeu.href}

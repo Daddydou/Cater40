@@ -1,20 +1,84 @@
 'use client'
-// app/page.tsx — Accueil Cater40
 
-const JEUX = [
-  { slug: 'quizz-friends',     nom: 'Quizz Friends',     emoji: '🛋️', desc: 'QCM pour experts de Friends' },
-  { slug: 'jeu-bras',          nom: 'Gros Bras',         emoji: '💪', desc: 'À qui appartient ce bras ?' },
-  { slug: 'dictee',            nom: 'Dictée',            emoji: '📝', desc: 'Dictée corrigée par l\'IA' },
-  { slug: 'citations-perdues', nom: 'Citations Perdues', emoji: '💬', desc: 'Le pendu des citations' },
-  { slug: 'concours-ortho',    nom: 'Concours Ortho',    emoji: '✍️', desc: 'QCM & orthophonie' },
-  { slug: 'famille-or',        nom: 'Famille en or',     emoji: '🏆', desc: '100 familles version Cater' },
-  { slug: 'mots-croises',      nom: 'Mots croisés',      emoji: '🔤', desc: 'Widget Claude — hors app' },
-  { slug: 'cater-en-or',       nom: 'Une Cater en or',   emoji: '🎯', desc: '2 équipes — tour à tour' },
-]
+import { useState, useEffect, useRef } from 'react'
+import { supabase } from '@/lib/supabase'
+
+const JEUX_META: Record<string, { nom: string; emoji: string }> = {
+  'quizz-friends':     { nom: 'Quizz Friends',    emoji: '📺' },
+  'jeu-bras':          { nom: 'Jeu des bras',      emoji: '💪' },
+  'dictee':            { nom: 'Dictée',            emoji: '✏️' },
+  'citations-perdues': { nom: 'Citations Perdues', emoji: '🎭' },
+  'concours-ortho':    { nom: 'Concours Ortho',    emoji: '📝' },
+  'famille-or':        { nom: 'Famille en Or',     emoji: '🏆' },
+}
+
+interface JeuVisible {
+  slug: string
+  ordre: number
+}
 
 export default function Home() {
+  const [jeux, setJeux]         = useState<JeuVisible[]>([])
+  const [newSlugs, setNewSlugs] = useState<Set<string>>(new Set())
+  const prevSlugs   = useRef<Set<string>>(new Set())
+  const isFirstFetch = useRef(true)
+  const initialized  = useRef(false)
+  const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const fetchJeux = async () => {
+    const { data } = await supabase
+      .from('jeux_visibles')
+      .select('slug, ordre')
+      .eq('visible', true)
+      .order('ordre', { ascending: true })
+
+    if (data) {
+      const current = data as JeuVisible[]
+      const currentSlugs = new Set(current.map(j => j.slug))
+
+      if (!isFirstFetch.current) {
+        const added = new Set([...currentSlugs].filter(s => !prevSlugs.current.has(s)))
+        if (added.size > 0) {
+          setNewSlugs(prev => new Set([...prev, ...added]))
+          setTimeout(() => {
+            setNewSlugs(prev => {
+              const next = new Set(prev)
+              added.forEach(s => next.delete(s))
+              return next
+            })
+          }, 700)
+        }
+      }
+
+      isFirstFetch.current = false
+      prevSlugs.current = currentSlugs
+      setJeux(current)
+    }
+  }
+
+  useEffect(() => {
+    if (initialized.current) return
+    initialized.current = true
+    fetchJeux()
+    intervalRef.current = setInterval(fetchJeux, 3000)
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [])
+
   return (
     <main className="min-h-screen bg-[#0f0f1a] text-white p-6">
+      <style>{`
+        @keyframes popIn {
+          0%   { opacity: 0; transform: scale(0.5) translateY(30px); }
+          70%  { transform: scale(1.08) translateY(-5px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .pop-in {
+          animation: popIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+      `}</style>
+
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-10 pt-6">
           <div className="text-5xl mb-3">🎂</div>
@@ -22,38 +86,32 @@ export default function Home() {
           <p className="text-white/50 text-sm">Les jeux des 40 ans de Cater</p>
         </div>
 
-        <div className="grid grid-cols-1 gap-3">
-          {JEUX.map((jeu) => {
-            if (jeu.slug === 'mots-croises') {
+        {jeux.length === 0 ? (
+          <div className="text-center text-white/30 text-sm mt-16">
+            <div className="text-4xl mb-4">✨</div>
+            <p>Les jeux arrivent bientôt…</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3">
+            {jeux.map((jeu) => {
+              const meta = JEUX_META[jeu.slug]
+              if (!meta) return null
               return (
-                <div key={jeu.slug}
-                  className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl p-4 opacity-50">
-                  <span className="text-3xl w-10 text-center">{jeu.emoji}</span>
+                <a
+                  key={jeu.slug}
+                  href={`/${jeu.slug}`}
+                  className={`flex items-center gap-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/25 rounded-2xl p-4 transition-all group${newSlugs.has(jeu.slug) ? ' pop-in' : ''}`}
+                >
+                  <span className="text-3xl w-10 text-center">{meta.emoji}</span>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">{jeu.nom}</span>
-                      <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">Widget Claude</span>
-                    </div>
-                    <p className="text-white/40 text-sm mt-0.5">{jeu.desc}</p>
+                    <span className="font-semibold group-hover:text-white transition-colors">{meta.nom}</span>
                   </div>
-                </div>
+                  <span className="text-white/20 group-hover:text-white/60 transition-colors">→</span>
+                </a>
               )
-            }
-            return (
-              <a key={jeu.slug} href={`/${jeu.slug}`}
-                className="flex items-center gap-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/25 rounded-2xl p-4 transition-all group">
-                <span className="text-3xl w-10 text-center">{jeu.emoji}</span>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold group-hover:text-white transition-colors">{jeu.nom}</span>
-                  </div>
-                  <p className="text-white/40 text-sm mt-0.5">{jeu.desc}</p>
-                </div>
-                <span className="text-white/20 group-hover:text-white/60 transition-colors">→</span>
-              </a>
-            )
-          })}
-        </div>
+            })}
+          </div>
+        )}
 
         <div className="mt-6 flex items-center justify-center gap-6">
           <a href="/joueurs" className="text-sm text-white/40 hover:text-white/70 transition-colors">
