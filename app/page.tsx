@@ -2,14 +2,14 @@
 // app/page.tsx — Accueil Cater40
 
 const JEUX = [
+  { slug: 'quizz-friends',     num: 9, nom: 'Quizz Friends',     emoji: '🛋️', desc: 'QCM pour experts de Friends' },
   { slug: 'jeu-bras',          num: 1, nom: 'Gros Bras',         emoji: '💪', desc: 'À qui appartient ce bras ?' },
-  { slug: 'concours-ortho',    num: 2, nom: 'Concours Ortho',    emoji: '✍️', desc: 'QCM & orthophonie' },
   { slug: 'dictee',            num: 3, nom: 'Dictée',            emoji: '📝', desc: 'Dictée corrigée par l\'IA' },
+  { slug: 'citations-perdues', num: 8, nom: 'Citations Perdues', emoji: '💬', desc: 'Le pendu des citations' },
+  { slug: 'concours-ortho',    num: 2, nom: 'Concours Ortho',    emoji: '✍️', desc: 'QCM & orthophonie' },
   { slug: 'famille-or',        num: 4, nom: 'Famille en or',     emoji: '🏆', desc: '100 familles version Cater' },
   { slug: 'mots-croises',      num: 5, nom: 'Mots croisés',      emoji: '🔤', desc: 'Widget Claude — hors app' },
   { slug: 'cater-en-or',       num: 6, nom: 'Une Cater en or',   emoji: '🎯', desc: '2 équipes — tour à tour' },
-{ slug: 'citations-perdues', num: 8, nom: 'Citations Perdues', emoji: '💬', desc: 'Le pendu des citations' },
-  { slug: 'quizz-friends',     num: 9, nom: 'Quizz Friends',     emoji: '🛋️', desc: 'QCM pour experts de Friends' },
 ]
 
 export default function Home() {
