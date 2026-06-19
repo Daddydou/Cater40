@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Nunito } from 'next/font/google'
 import { supabase, getActiveRoom } from '@/lib/supabase'
 import { getResultLevel } from '@/lib/jeu-bras-data'
+import Link from 'next/link'
 
 const nunito = Nunito({ subsets: ['latin'] })
 
@@ -251,6 +252,7 @@ export default function JeuBrasAnimateur() {
     return (
       <main className={`${nunito.className} min-h-screen bg-[#0a0a0a] px-4 py-8`}>
         <div className="w-full max-w-md mx-auto flex flex-col gap-6">
+          <Link href="/animateur" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-yellow-400 transition-colors font-bold tracking-wide">← Hub</Link>
           <div className="text-center">
             <div className="text-5xl mb-2">💪</div>
             <h1 className="text-white text-2xl font-bold">Gros Bras — Animateur</h1>

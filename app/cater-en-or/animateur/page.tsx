@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Confetti } from '@/components/Confetti'
 import { useWakeLock } from '@/lib/hooks/useWakeLock'
+import Link from 'next/link'
 
 const ROOM_CODE = 'cater-en-or'
 
@@ -211,6 +212,7 @@ export default function CaterEnOrAnimateurPage() {
     const nameB = session?.team_b_name || 'Équipe B'
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950 relative">
+        <Link href="/animateur" className="absolute top-4 left-4 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-yellow-400 transition-colors font-bold tracking-wide">← Hub</Link>
         {session?.status === 'finished' && <Confetti />}
         <div className="text-center space-y-6 relative z-10">
           <div>
@@ -263,7 +265,10 @@ export default function CaterEnOrAnimateurPage() {
       <div className="min-h-screen bg-gray-950 text-white p-6">
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-between items-center mb-8">
-            <h1 className="text-2xl font-bold text-yellow-400">🎯 Une Cater en or — Lobby</h1>
+            <div className="flex items-center gap-3">
+              <Link href="/animateur" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-yellow-400 transition-colors font-bold tracking-wide">← Hub</Link>
+              <h1 className="text-2xl font-bold text-yellow-400">🎯 Une Cater en or — Lobby</h1>
+            </div>
             <button
               onClick={resetSession}
               className="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"

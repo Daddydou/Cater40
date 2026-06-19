@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import Link from 'next/link'
 
 const ROOM_CODE = 'dictee'
 
@@ -151,6 +152,7 @@ export default function DicteeAnimateur() {
     return (
       <main className="min-h-screen bg-[#1a1a0f] text-white px-4 py-8">
         <div className="max-w-md mx-auto space-y-5">
+          <Link href="/animateur" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-yellow-400 transition-colors font-bold tracking-wide">← Hub</Link>
           <div className="text-center">
             <div className="text-5xl mb-2">📝</div>
             <h1 className="text-2xl font-bold">La Dictée — Animateur</h1>
@@ -201,6 +203,7 @@ export default function DicteeAnimateur() {
     return (
       <main className="min-h-screen bg-[#1a1a0f] text-white px-4 py-8">
         <div className="max-w-md mx-auto space-y-6">
+          <Link href="/animateur" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-yellow-400 transition-colors font-bold tracking-wide">← Hub</Link>
           <div className="text-center">
             <div className="text-5xl mb-2">🎙️</div>
             <h1 className="text-2xl font-bold">Dictée en cours</h1>
@@ -235,6 +238,7 @@ export default function DicteeAnimateur() {
     return (
       <main className="min-h-screen bg-[#1a1a0f] text-white px-4 py-8">
         <div className="max-w-md mx-auto space-y-6">
+          <Link href="/animateur" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-yellow-400 transition-colors font-bold tracking-wide">← Hub</Link>
           <div className="text-center">
             <div className="text-5xl mb-2">✏️</div>
             <h1 className="text-2xl font-bold">Correction en cours</h1>
@@ -274,6 +278,7 @@ export default function DicteeAnimateur() {
     return (
       <main className="min-h-screen bg-[#1a1a0f] text-white px-4 py-8">
         <div className="max-w-md mx-auto space-y-5">
+          <Link href="/animateur" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-yellow-400 transition-colors font-bold tracking-wide">← Hub</Link>
           <div className="text-center">
             <div className="text-5xl mb-2">🔢</div>
             <h1 className="text-2xl font-bold">Saisie des notes</h1>

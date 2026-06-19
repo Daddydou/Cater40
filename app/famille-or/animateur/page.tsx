@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { defaultQuestions, defaultFinaleQuestions } from '@/lib/famille-or-data'
 import PlayerAvatar from '@/lib/components/PlayerAvatar'
+import Link from 'next/link'
 
 const ROOM_CODE = 'famille-or'
 
@@ -552,9 +553,12 @@ export default function FamilleOrAnimateur() {
     return (
       <main className="min-h-screen bg-[#1a237e] text-white p-5">
         <div className="max-w-lg mx-auto space-y-5">
-          <div className="pt-2">
-            <h1 className="text-xl font-bold">🏆 Famille en Or</h1>
-            <p className="text-white/40 text-sm">Interface animateur</p>
+          <div className="flex items-center gap-3 pt-2">
+            <Link href="/animateur" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-yellow-400 transition-colors font-bold tracking-wide">← Hub</Link>
+            <div>
+              <h1 className="text-xl font-bold">🏆 Famille en Or</h1>
+              <p className="text-white/40 text-sm">Interface animateur</p>
+            </div>
           </div>
           <div className="bg-white/5 border border-white/10 rounded-2xl p-3 text-xs text-white/40">
             <p>Joueurs → <span className="text-blue-300 font-mono">{gameUrl}</span></p>

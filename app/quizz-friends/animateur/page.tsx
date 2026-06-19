@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { FRIENDS_QUESTIONS } from '@/lib/friends-quiz-data'
 import PlayerAvatar from '@/lib/components/PlayerAvatar'
+import Link from 'next/link'
 
 const ROOM_CODE = 'quizz-friends'
 const TOTAL_Q   = FRIENDS_QUESTIONS.length
@@ -154,9 +155,12 @@ export default function QuizzFriendsAnimateur() {
 
         {/* Header */}
         <div className="flex items-center justify-between pt-2">
-          <div>
-            <h1 className="text-xl font-bold text-yellow-400">🛋️ Quizz Friends</h1>
-            <p className="text-white/40 text-sm">Interface animateur</p>
+          <div className="flex items-center gap-3">
+            <Link href="/animateur" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-yellow-400 transition-colors font-bold tracking-wide">← Hub</Link>
+            <div>
+              <h1 className="text-xl font-bold text-yellow-400">🛋️ Quizz Friends</h1>
+              <p className="text-white/40 text-sm">Interface animateur</p>
+            </div>
           </div>
           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
             gameState?.status === 'waiting'  ? 'bg-yellow-500/20 text-yellow-300' :
