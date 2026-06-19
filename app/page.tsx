@@ -37,13 +37,13 @@ export default function Home() {
       const currentSlugs = new Set(current.map(j => j.slug))
 
       if (!isFirstFetch.current) {
-        const added = new Set([...currentSlugs].filter(s => !prevSlugs.current.has(s)))
-        if (added.size > 0) {
-          setNewSlugs(prev => new Set([...prev, ...added]))
+        const addedArr = current.map(j => j.slug).filter(s => !prevSlugs.current.has(s))
+        if (addedArr.length > 0) {
+          setNewSlugs(prev => new Set([...Array.from(prev), ...addedArr]))
           setTimeout(() => {
             setNewSlugs(prev => {
-              const next = new Set(prev)
-              added.forEach(s => next.delete(s))
+              const next = new Set(Array.from(prev))
+              addedArr.forEach(s => next.delete(s))
               return next
             })
           }, 700)
