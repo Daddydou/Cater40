@@ -15,14 +15,20 @@ const JEUX = [
   { num: 9, nom: 'Quizz Friends',    emoji: '🛋️', code: 'quizz-friends',   href: '/quizz-friends/animateur' },
 ] as const
 
-const JEUX_REVELABLES = [
-  { slug: 'quizz-friends',     nom: 'Quizz Friends',    emoji: '📺' },
-  { slug: 'jeu-bras',          nom: 'Jeu des bras',      emoji: '💪' },
-  { slug: 'dictee',            nom: 'Dictée',            emoji: '✏️' },
-  { slug: 'citations-perdues', nom: 'Citations Perdues', emoji: '🎭' },
-  { slug: 'concours-ortho',    nom: 'Concours Ortho',    emoji: '📝' },
-  { slug: 'famille-or',        nom: 'Famille en Or',     emoji: '🏆' },
-]
+const JEUX_META: Record<string, { nom: string; emoji: string }> = {
+  'quizz-friends':     { nom: 'Quizz Friends',    emoji: '📺' },
+  'jeu-bras':          { nom: 'Jeu des bras',      emoji: '💪' },
+  'dictee':            { nom: 'Dictée',            emoji: '✏️' },
+  'citations-perdues': { nom: 'Citations Perdues', emoji: '🎭' },
+  'concours-ortho':    { nom: 'Concours Ortho',    emoji: '📝' },
+  'famille-or':        { nom: 'Famille en Or',     emoji: '🏆' },
+}
+
+interface JeuData {
+  slug: string
+  visible: boolean
+  ordre: number
+}
 
 const ROOM_CODES = JEUX.flatMap(j => j.code ? [j.code] : [])
 
@@ -46,10 +52,10 @@ function StatusBadge({ status }: { status?: string }) {
 }
 
 export default function HubAnimateur() {
-  const [statuses, setStatuses]       = useState<Record<string, string>>({})
-  const [resetting, setResetting]     = useState<string | null>(null)
-  const [jeuxVisibles, setJeuxVisibles] = useState<Record<string, boolean>>({})
-  const [revealing, setRevealing]     = useState<string | null>(null)
+  const [statuses, setStatuses]   = useState<Record<string, string>>({})
+  const [resetting, setResetting] = useState<string | null>(null)
+  const [jeuxData, setJeuxData]   = useState<JeuData[]>([])
+  const [revealing, setRevealing] = useState<string | null>(null)
   const initialized = useRef(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -68,12 +74,9 @@ export default function HubAnimateur() {
   const fetchJeuxVisibles = async () => {
     const { data } = await supabase
       .from('jeux_visibles')
-      .select('slug, visible')
-    if (data) {
-      const map: Record<string, boolean> = {}
-      for (const row of data) map[row.slug] = row.visible
-      setJeuxVisibles(map)
-    }
+      .select('slug, visible, ordre')
+      .order('ordre', { ascending: true })
+    if (data) setJeuxData(data as JeuData[])
   }
 
   useEffect(() => {
@@ -92,12 +95,33 @@ export default function HubAnimateur() {
 
   const handleReveler = async (slug: string) => {
     setRevealing(slug)
-    await supabase
-      .from('jeux_visibles')
-      .update({ visible: true })
-      .eq('slug', slug)
+    await supabase.from('jeux_visibles').update({ visible: true }).eq('slug', slug)
     await fetchJeuxVisibles()
     setRevealing(null)
+  }
+
+  const handleMove = async (slug: string, direction: 'up' | 'down') => {
+    const sorted = [...jeuxData].sort((a, b) => a.ordre - b.ordre)
+    const idx = sorted.findIndex(j => j.slug === slug)
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (targetIdx < 0 || targetIdx >= sorted.length) return
+
+    const a = sorted[idx]
+    const b = sorted[targetIdx]
+
+    // Optimistic update
+    setJeuxData(prev =>
+      prev.map(j => {
+        if (j.slug === a.slug) return { ...j, ordre: b.ordre }
+        if (j.slug === b.slug) return { ...j, ordre: a.ordre }
+        return j
+      })
+    )
+
+    await Promise.all([
+      supabase.from('jeux_visibles').update({ ordre: b.ordre }).eq('slug', a.slug),
+      supabase.from('jeux_visibles').update({ ordre: a.ordre }).eq('slug', b.slug),
+    ])
   }
 
   const handleResetAll = async () => {
@@ -129,6 +153,8 @@ export default function HubAnimateur() {
     setResetting(null)
   }
 
+  const sortedJeux = [...jeuxData].sort((a, b) => a.ordre - b.ordre)
+
   return (
     <main className="min-h-screen bg-[#0f0f1a] text-white p-6">
       <div className="max-w-lg mx-auto">
@@ -142,13 +168,31 @@ export default function HubAnimateur() {
         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6">
           <h2 className="text-sm font-bold text-white/70 mb-3">🎉 Révéler les jeux</h2>
           <div className="space-y-2">
-            {JEUX_REVELABLES.map(jeu => {
-              const visible = jeuxVisibles[jeu.slug]
+            {sortedJeux.map((jeu, idx) => {
+              const meta = JEUX_META[jeu.slug]
+              if (!meta) return null
               return (
-                <div key={jeu.slug} className="flex items-center gap-3">
-                  <span className="text-xl w-8 text-center">{jeu.emoji}</span>
-                  <span className="flex-1 text-sm font-medium">{jeu.nom}</span>
-                  {visible ? (
+                <div key={jeu.slug} className="flex items-center gap-2">
+                  {/* Boutons ↑↓ */}
+                  <div className="flex flex-col gap-0.5">
+                    <button
+                      onClick={() => handleMove(jeu.slug, 'up')}
+                      disabled={idx === 0}
+                      className="text-[10px] leading-none px-1 py-0.5 rounded text-white/30 hover:text-white/70 disabled:opacity-0 transition-colors"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      onClick={() => handleMove(jeu.slug, 'down')}
+                      disabled={idx === sortedJeux.length - 1}
+                      className="text-[10px] leading-none px-1 py-0.5 rounded text-white/30 hover:text-white/70 disabled:opacity-0 transition-colors"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                  <span className="text-xl w-7 text-center">{meta.emoji}</span>
+                  <span className="flex-1 text-sm font-medium">{meta.nom}</span>
+                  {jeu.visible ? (
                     <span className="text-xs text-white/30 font-semibold">✅ Révélé</span>
                   ) : (
                     <button
