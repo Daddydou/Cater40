@@ -154,6 +154,20 @@ export default function HubAnimateur() {
     setResetting(null)
   }
 
+  const handleResetCitations = async () => {
+    if (!confirm('Réinitialiser Citations Perdues ? La partie en cours sera supprimée.')) return
+    setResetting('citations-perdues')
+    await supabase.from('citations_game').update({
+      points: 0,
+      phrases_validees: Array(14).fill(false),
+      lettres_achetees: [],
+      lettres_colorees_revelees: [],
+      phase2_debloquee: false,
+      hint_index: 0,
+    }).neq('id', '00000000-0000-0000-0000-000000000000')
+    setResetting(null)
+  }
+
   const sortedJeux = [...jeuxData].sort((a, b) => a.ordre - b.ordre)
 
   return (
@@ -247,6 +261,16 @@ export default function HubAnimateur() {
                     className="px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-sm transition-all active:scale-95 disabled:opacity-40"
                   >
                     {resetting === jeu.code ? '…' : '↺'}
+                  </button>
+                )}
+                {jeu.num === 8 && (
+                  <button
+                    onClick={handleResetCitations}
+                    disabled={resetting === 'citations-perdues'}
+                    title="Réinitialiser Citations Perdues"
+                    className="px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-sm transition-all active:scale-95 disabled:opacity-40"
+                  >
+                    {resetting === 'citations-perdues' ? '…' : '↺'}
                   </button>
                 )}
               </div>
