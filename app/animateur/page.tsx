@@ -9,7 +9,6 @@ const JEUX = [
   { num: 2, nom: 'Concours Ortho',   emoji: '✍️', code: 'concours-ortho', href: '/concours-ortho/animateur' },
   { num: 3, nom: 'Dictée',           emoji: '📝', code: 'dictee',          href: '/dictee/animateur' },
   { num: 4, nom: 'Famille en or',    emoji: '🏆', code: 'famille-or',      href: '/famille-or/animateur' },
-  { num: 6, nom: 'Une Cater en or',  emoji: '🎯', code: 'cater-en-or',     href: '/cater-en-or/animateur' },
   { num: 8, nom: 'Citations Perdues',emoji: '💬', code: null,              href: '/citations-perdues' },
   { num: 9, nom: 'Quizz Friends',    emoji: '🛋️', code: 'quizz-friends',   href: '/quizz-friends/animateur' },
 ] as const
@@ -72,7 +71,7 @@ export default function HubAnimateur() {
       const idMap: Record<string, string> = {}
       for (const row of data) {
         statusMap[row.code] = row.status
-        if (row.code !== 'cater-en-or') idMap[row.code] = row.id
+        idMap[row.code] = row.id
       }
       setStatuses(statusMap)
       roomIdsRef.current = idMap
@@ -176,7 +175,7 @@ export default function HubAnimateur() {
   const handleResetAll = async () => {
     if (!confirm('Réinitialiser TOUS les jeux ? Tous les joueurs et scores seront supprimés.')) return
 
-    const codes = ['jeu-bras', 'concours-ortho', 'dictee', 'famille-or', 'cater-en-or', 'citations-perdues', 'quizz-friends']
+    const codes = ['jeu-bras', 'concours-ortho', 'dictee', 'famille-or', 'citations-perdues', 'quizz-friends']
     await Promise.all(codes.map(code => supabase.rpc('reset_room', { p_code: code })))
 
     await supabase.from('citations_game').delete().neq('id', '00000000-0000-0000-0000-000000000000')
@@ -325,7 +324,7 @@ export default function HubAnimateur() {
                 <StatusBadge status={jeu.code ? statuses[jeu.code] : undefined} />
               </div>
 
-              {jeu.code != null && jeu.code !== 'cater-en-or' && connected[jeu.code] !== undefined && (
+              {jeu.code != null && connected[jeu.code] !== undefined && (
                 <div className="mb-3 pl-[2.25rem]">
                   {(connected[jeu.code] ?? 0) > 0 ? (
                     <span className="text-xs font-semibold text-green-400">
