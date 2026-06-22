@@ -71,7 +71,7 @@ export default function HubAnimateur() {
       const idMap: Record<string, string> = {}
       for (const row of data) {
         statusMap[row.code] = row.status
-        idMap[row.code]     = row.id
+        if (row.code !== 'cater-en-or') idMap[row.code] = row.id
       }
       setStatuses(statusMap)
       roomIdsRef.current = idMap
@@ -301,7 +301,7 @@ export default function HubAnimateur() {
                 <StatusBadge status={jeu.code ? statuses[jeu.code] : undefined} />
               </div>
 
-              {jeu.code != null && connected[jeu.code] !== undefined && (
+              {jeu.code != null && jeu.code !== 'cater-en-or' && connected[jeu.code] !== undefined && (
                 <div className="mb-3 pl-[2.25rem]">
                   {(connected[jeu.code] ?? 0) > 0 ? (
                     <span className="text-xs font-semibold text-green-400">
