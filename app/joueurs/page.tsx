@@ -17,7 +17,15 @@ interface JeuVisible {
   ordre: number
 }
 
+interface ChatMessage {
+  id: string
+  auteur: string
+  contenu: string
+  created_at: string
+}
+
 export default function PortailJoueurs() {
+  // ── Jeux ──────────────────────────────────────────────────
   const [jeux, setJeux]         = useState<JeuVisible[]>([])
   const [newSlugs, setNewSlugs] = useState<Set<string>>(new Set())
   const prevSlugs    = useRef<Set<string>>(new Set())
@@ -25,6 +33,17 @@ export default function PortailJoueurs() {
   const initialized  = useRef(false)
   const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // ── Chat ──────────────────────────────────────────────────
+  const [prenom, setPrenom]         = useState('')
+  const [prenomReady, setPrenomReady] = useState(false)
+  const [prenomInput, setPrenomInput] = useState('')
+  const [messages, setMessages]     = useState<ChatMessage[]>([])
+  const [msgInput, setMsgInput]     = useState('')
+  const chatInitialized = useRef(false)
+  const chatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const chatBottomRef   = useRef<HTMLDivElement>(null)
+
+  // ── Fetch jeux ────────────────────────────────────────────
   const fetchJeux = async () => {
     const { data } = await supabase
       .from('jeux_visibles')
@@ -56,6 +75,17 @@ export default function PortailJoueurs() {
     }
   }
 
+  // ── Fetch messages ────────────────────────────────────────
+  const fetchMessages = async () => {
+    const { data } = await supabase
+      .from('chat_messages')
+      .select('id, auteur, contenu, created_at')
+      .order('created_at', { ascending: true })
+      .limit(50)
+    if (data) setMessages(data as ChatMessage[])
+  }
+
+  // ── Polling jeux (3s) ─────────────────────────────────────
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
@@ -65,6 +95,45 @@ export default function PortailJoueurs() {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [])
+
+  // ── Lire le prénom en sessionStorage (côté client) ────────
+  useEffect(() => {
+    const saved = sessionStorage.getItem('cater40_prenom') ?? ''
+    setPrenom(saved)
+    setPrenomReady(true)
+  }, [])
+
+  // ── Polling chat (2s) — démarre une seule fois dès que prenom est connu ──
+  useEffect(() => {
+    if (!prenom || chatInitialized.current) return
+    chatInitialized.current = true
+    fetchMessages()
+    chatIntervalRef.current = setInterval(fetchMessages, 2000)
+    return () => {
+      if (chatIntervalRef.current) clearInterval(chatIntervalRef.current)
+    }
+  }, [prenom])
+
+  // ── Auto-scroll vers le bas à chaque nouveau message ──────
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  // ── Handlers chat ─────────────────────────────────────────
+  const handleSavePrenom = () => {
+    const p = prenomInput.trim()
+    if (!p) return
+    sessionStorage.setItem('cater40_prenom', p)
+    setPrenom(p)
+  }
+
+  const handleSendMessage = async () => {
+    const contenu = msgInput.trim()
+    if (!contenu || !prenom) return
+    setMsgInput('')
+    await supabase.from('chat_messages').insert({ auteur: prenom, contenu })
+    await fetchMessages()
+  }
 
   return (
     <>
@@ -120,6 +189,75 @@ export default function PortailJoueurs() {
             ← Retour à l&apos;accueil
           </a>
         </div>
+
+        {/* ── Chat ─────────────────────────────────────────── */}
+        {prenomReady && (
+          <div className="mt-8 pb-6">
+            {!prenom ? (
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                <p className="text-sm text-white/60 mb-3">💬 Chat — entre ton prénom pour participer :</p>
+                <div className="flex gap-2">
+                  <input
+                    value={prenomInput}
+                    onChange={e => setPrenomInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSavePrenom()}
+                    placeholder="Ton prénom"
+                    maxLength={30}
+                    autoFocus
+                    className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm outline-none focus:border-white/40 transition-colors placeholder:text-white/30"
+                  />
+                  <button
+                    onClick={handleSavePrenom}
+                    disabled={!prenomInput.trim()}
+                    className="bg-white/20 hover:bg-white/30 disabled:opacity-30 px-4 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-white/10 flex items-center gap-2">
+                  <span className="text-xs text-white/40">💬 Chat</span>
+                  <span className="text-white/20 text-xs">·</span>
+                  <span className="text-xs font-bold text-purple-300">{prenom}</span>
+                </div>
+
+                <div className="h-52 overflow-y-auto px-4 py-3 space-y-2">
+                  {messages.length === 0 && (
+                    <p className="text-white/25 text-xs text-center pt-6">Aucun message pour l&apos;instant…</p>
+                  )}
+                  {messages.map(msg => (
+                    <div key={msg.id} className="text-sm leading-snug">
+                      <span className="font-bold text-purple-300">{msg.auteur}</span>
+                      <span className="text-white/30 mx-1">:</span>
+                      <span className="text-white/85">{msg.contenu}</span>
+                    </div>
+                  ))}
+                  <div ref={chatBottomRef} />
+                </div>
+
+                <div className="px-4 py-3 border-t border-white/10 flex gap-2">
+                  <input
+                    value={msgInput}
+                    onChange={e => setMsgInput(e.target.value.slice(0, 200))}
+                    onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+                    placeholder="Ton message…"
+                    maxLength={200}
+                    className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm outline-none focus:border-purple-500/50 transition-colors placeholder:text-white/30"
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={!msgInput.trim()}
+                    className="bg-purple-500 hover:bg-purple-400 disabled:opacity-30 px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95"
+                  >
+                    →
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </main>
     </>
