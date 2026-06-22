@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import Image from 'next/image'
 import { Confetti } from '@/components/Confetti'
 
 const JEUX_META: Record<string, { nom: string; emoji: string }> = {
@@ -85,7 +86,19 @@ export default function Home() {
     <>
       {cloture && (
         <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-pink-950 via-purple-950 to-indigo-900 flex flex-col items-center justify-center">
+          {/* Couche 1 : photo de fond */}
+          <Image
+            src="/cater-surprise.jpg"
+            alt=""
+            fill
+            priority
+            className="object-cover"
+          />
+          {/* Couche 2 : voile sombre */}
+          <div className="absolute inset-0 bg-black/50" />
+          {/* Couche 3 : confettis */}
           <Confetti />
+          {/* Couche 4 : texte */}
           <div className="relative z-[1] text-center px-8 space-y-6 pointer-events-none">
             <div className="text-8xl">🎂</div>
             <p className="text-white text-5xl font-black leading-tight drop-shadow-2xl">
