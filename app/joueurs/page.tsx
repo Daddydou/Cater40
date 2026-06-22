@@ -190,6 +190,21 @@ export default function PortailJoueurs() {
           </a>
         </div>
 
+        {/* ── Pourboire ────────────────────────────────────── */}
+        <div className="mt-8 bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+          <p className="text-xs text-white/50 mb-3">
+            ☕ Les jeux sont 100% gratuits 😄 mais si le cœur vous en dit, vous pouvez soutenir les créateurs 🍻
+          </p>
+          <a
+            href="https://www.paypal.com/paypalme/daddyducul"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-300 text-xs font-semibold px-4 py-2 rounded-xl transition-all active:scale-95"
+          >
+            Soutenir ☕
+          </a>
+        </div>
+
         {/* ── Chat ─────────────────────────────────────────── */}
         {prenomReady && (
           <div className="mt-8 pb-6">
