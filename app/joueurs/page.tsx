@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import PauseOverlay from '@/components/PauseOverlay'
 
 const JEUX_META: Record<string, { nom: string; emoji: string }> = {
   'quizz-friends':  { nom: 'Quizz Friends',  emoji: '📺' },
@@ -66,7 +67,9 @@ export default function PortailJoueurs() {
   }, [])
 
   return (
-    <main className="min-h-screen bg-[#0f0f1a] text-white p-6">
+    <>
+      <PauseOverlay />
+      <main className="min-h-screen bg-[#0f0f1a] text-white p-6">
       <style>{`
         @keyframes popIn {
           0%   { opacity: 0; transform: scale(0.5) translateY(30px); }
@@ -119,5 +122,6 @@ export default function PortailJoueurs() {
         </div>
       </div>
     </main>
+    </>
   )
 }

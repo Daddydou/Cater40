@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import PlayerAvatar from '@/lib/components/PlayerAvatar'
 import { uploadAvatar } from '@/lib/hooks/useAvatarUpload'
 import { FRIENDS_QUESTIONS, seededShuffle } from '@/lib/friends-quiz-data'
+import PauseOverlay from '@/components/PauseOverlay'
 
 const ROOM_CODE = 'quizz-friends'
 
@@ -160,6 +161,7 @@ export default function QuizzFriends() {
     'hover:bg-purple-500/20 hover:border-purple-500/50',
   ]
 
+  const renderContent = () => {
   // ── Saisie prénom ─────────────────────────────────────────
   if (step === 'prenom') {
     return (
@@ -267,5 +269,13 @@ export default function QuizzFriends() {
 
       </div>
     </main>
+  )
+  }
+
+  return (
+    <>
+      <PauseOverlay />
+      {renderContent()}
+    </>
   )
 }

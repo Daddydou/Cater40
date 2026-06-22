@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import PauseOverlay from '@/components/PauseOverlay'
 
 const ROOM_CODE = 'dictee'
 
@@ -115,6 +116,7 @@ export default function Dictee() {
     }
   }
 
+  const renderContent = () => {
   // ── Prenom ─────────────────────────────────────────────────────
   if (step === 'prenom') {
     return (
@@ -209,4 +211,12 @@ export default function Dictee() {
   }
 
   return null
+  }
+
+  return (
+    <>
+      <PauseOverlay />
+      {renderContent()}
+    </>
+  )
 }

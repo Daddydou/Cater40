@@ -55,6 +55,7 @@ export default function HubAnimateur() {
   const [resetting, setResetting] = useState<string | null>(null)
   const [jeuxData, setJeuxData]   = useState<JeuData[]>([])
   const [revealing, setRevealing] = useState<string | null>(null)
+  const [paused, setPaused]       = useState(false)
   const initialized = useRef(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -78,14 +79,25 @@ export default function HubAnimateur() {
     if (data) setJeuxData(data as JeuData[])
   }
 
+  const fetchPause = async () => {
+    const { data } = await supabase
+      .from('app_state')
+      .select('pause_globale')
+      .eq('id', 1)
+      .maybeSingle()
+    if (data !== null) setPaused(data.pause_globale)
+  }
+
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
     fetchStatuses()
     fetchJeuxVisibles()
+    fetchPause()
     intervalRef.current = setInterval(() => {
       fetchStatuses()
       fetchJeuxVisibles()
+      fetchPause()
     }, 3000)
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
@@ -167,6 +179,12 @@ export default function HubAnimateur() {
     setResetting(null)
   }
 
+  const handleTogglePause = async () => {
+    const next = !paused
+    setPaused(next)
+    await supabase.from('app_state').update({ pause_globale: next }).eq('id', 1)
+  }
+
   const sortedJeux = [...jeuxData].sort((a, b) => a.ordre - b.ordre)
 
   return (
@@ -178,7 +196,19 @@ export default function HubAnimateur() {
           <p className="text-white/40 text-sm mt-1">Vue d&apos;ensemble et accès rapide</p>
         </div>
 
-        {/* Révélation progressive des jeux */}
+        {/* Mode Panique */}
+      <button
+        onClick={handleTogglePause}
+        className={`w-full font-black text-xl rounded-2xl py-5 mb-6 transition-all active:scale-95 border-2 ${
+          paused
+            ? 'bg-green-500/20 hover:bg-green-500/30 border-green-400 text-green-300'
+            : 'bg-orange-500 hover:bg-orange-400 border-orange-400 text-white'
+        }`}
+      >
+        {paused ? '▶️ REPRENDRE' : '⏸️ PAUSE — Mode panique'}
+      </button>
+
+      {/* Révélation progressive des jeux */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6">
           <h2 className="text-sm font-bold text-white/70 mb-3">🎉 Révéler les jeux</h2>
           <div className="space-y-2">

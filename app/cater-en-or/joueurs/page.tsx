@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useWakeLock } from '@/lib/hooks/useWakeLock'
 import PlayerAvatar from '@/lib/components/PlayerAvatar'
 import { uploadAvatar } from '@/lib/hooks/useAvatarUpload'
+import PauseOverlay from '@/components/PauseOverlay'
 
 const ROOM_CODE = 'cater-en-or'
 
@@ -151,6 +152,7 @@ export default function CaterEnOrPage() {
     setJoining(false)
   }
 
+  const renderContent = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950">
@@ -315,5 +317,13 @@ export default function CaterEnOrPage() {
         </div>
       </div>
     </div>
+  )
+  }
+
+  return (
+    <>
+      <PauseOverlay />
+      {renderContent()}
+    </>
   )
 }

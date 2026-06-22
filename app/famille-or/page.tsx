@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import PlayerAvatar from '@/lib/components/PlayerAvatar'
 import { uploadAvatar } from '@/lib/hooks/useAvatarUpload'
+import PauseOverlay from '@/components/PauseOverlay'
 
 const ROOM_CODE = 'famille-or'
 
@@ -183,6 +184,7 @@ export default function FamilleOrJoueurs() {
     ? (question.equipe_active === 1 ? question.croix_equipe1 : question.croix_equipe2)
     : 0
 
+  const renderContent = () => {
   if (loading) return (
     <main className="min-h-screen bg-[#1a237e] flex items-center justify-center text-white">
       <p className="text-white/40">Chargement…</p>
@@ -483,5 +485,13 @@ export default function FamilleOrJoueurs() {
 
       </div>
     </main>
+  )
+  }
+
+  return (
+    <>
+      <PauseOverlay />
+      {renderContent()}
+    </>
   )
 }

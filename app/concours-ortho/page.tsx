@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { vibrate } from '@/lib/vibrate'
 import PlayerAvatar from '@/lib/components/PlayerAvatar'
 import { uploadAvatar } from '@/lib/hooks/useAvatarUpload'
+import PauseOverlay from '@/components/PauseOverlay'
 
 const ROOM_CODE = 'concours-ortho'
 
@@ -200,6 +201,7 @@ useEffect(() => {
     </div>
   ) : null
 
+  const renderContent = () => {
   // ── Saisie prénom ─────────────────────────────────────────
   if (step === 'prenom') {
     return (
@@ -361,5 +363,13 @@ useEffect(() => {
 
       </div>
     </main>
+  )
+  }
+
+  return (
+    <>
+      <PauseOverlay />
+      {renderContent()}
+    </>
   )
 }
