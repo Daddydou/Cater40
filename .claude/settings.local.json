@@ -47,7 +47,10 @@
       "WebFetch(domain:www.soccergraph.com)",
       "PowerShell(git *)",
       "Bash(python3 *)",
-      "Bash(python /tmp/fix_finale.py)"
+      "Bash(python /tmp/fix_finale.py)",
+      "Bash(python generate_icons.py)",
+      "Bash(pip install *)",
+      "PowerShell(Remove-Item *)"
     ]
   }
 }
