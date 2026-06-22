@@ -190,6 +190,8 @@ export default function HubAnimateur() {
     await supabase.from('cater_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
     await supabase.from('friends_game').delete().neq('id', '00000000-0000-0000-0000-000000000000')
     await supabase.from('friends_answers').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    const { error: chatErr } = await supabase.from('chat_messages').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    if (chatErr) console.error('Erreur vidage chat:', chatErr)
     await supabase.from('jeux_visibles').update({ visible: false }).neq('slug', '')
 
     await fetchStatuses()
