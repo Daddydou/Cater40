@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { Confetti } from '@/components/Confetti'
 
 const JEUX_META: Record<string, { nom: string; emoji: string }> = {
   'quizz-friends':     { nom: 'Quizz Friends',    emoji: '📺' },
@@ -24,6 +25,7 @@ export default function Home() {
   const isFirstFetch = useRef(true)
   const initialized  = useRef(false)
   const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [cloture, setCloture] = useState(false)
 
   const fetchJeux = async () => {
     const { data } = await supabase
@@ -56,18 +58,44 @@ export default function Home() {
     }
   }
 
+  const fetchCloture = async () => {
+    const { data } = await supabase
+      .from('app_state')
+      .select('cloture_cater')
+      .eq('id', 1)
+      .maybeSingle()
+    if (data !== null) setCloture(data.cloture_cater)
+  }
+
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
     fetchJeux()
-    intervalRef.current = setInterval(fetchJeux, 3000)
+    fetchCloture()
+    intervalRef.current = setInterval(() => {
+      fetchJeux()
+      fetchCloture()
+    }, 3000)
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [])
 
   return (
-    <main className="min-h-screen bg-[#0f0f1a] text-white p-6">
+    <>
+      {cloture && (
+        <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-pink-950 via-purple-950 to-indigo-900 flex flex-col items-center justify-center">
+          <Confetti />
+          <div className="relative z-[1] text-center px-8 space-y-6 pointer-events-none">
+            <div className="text-8xl">🎂</div>
+            <p className="text-white text-5xl font-black leading-tight drop-shadow-2xl">
+              Joyeux anniversaire<br />ma Cat&apos; que j&apos;aime ❤️
+            </p>
+            <div className="text-5xl">✨🎉💖</div>
+          </div>
+        </div>
+      )}
+      <main className="min-h-screen bg-[#0f0f1a] text-white p-6">
       <style>{`
         @keyframes popIn {
           0%   { opacity: 0; transform: scale(0.5) translateY(30px); }
@@ -126,5 +154,6 @@ export default function Home() {
         </div>
       </div>
     </main>
+    </>
   )
 }

@@ -56,6 +56,7 @@ export default function HubAnimateur() {
   const [jeuxData, setJeuxData]   = useState<JeuData[]>([])
   const [revealing, setRevealing] = useState<string | null>(null)
   const [paused, setPaused]       = useState(false)
+  const [cloture, setCloture]     = useState(false)
   const [connected, setConnected] = useState<Record<string, number>>({})
   const initialized  = useRef(false)
   const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -113,17 +114,28 @@ export default function HubAnimateur() {
     if (data !== null) setPaused(data.pause_globale)
   }
 
+  const fetchCloture = async () => {
+    const { data } = await supabase
+      .from('app_state')
+      .select('cloture_cater')
+      .eq('id', 1)
+      .maybeSingle()
+    if (data !== null) setCloture(data.cloture_cater)
+  }
+
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
     fetchStatuses().then(fetchConnected)
     fetchJeuxVisibles()
     fetchPause()
+    fetchCloture()
     intervalRef.current = setInterval(() => {
       fetchStatuses()
       fetchJeuxVisibles()
       fetchPause()
       fetchConnected()
+      fetchCloture()
     }, 3000)
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
@@ -203,6 +215,16 @@ export default function HubAnimateur() {
       hint_index: 0,
     }).neq('id', '00000000-0000-0000-0000-000000000000')
     setResetting(null)
+  }
+
+  const handleTriggerCloture = async () => {
+    setCloture(true)
+    await supabase.from('app_state').update({ cloture_cater: true }).eq('id', 1)
+  }
+
+  const handleResetCloture = async () => {
+    setCloture(false)
+    await supabase.from('app_state').update({ cloture_cater: false }).eq('id', 1)
   }
 
   const handleTogglePause = async () => {
@@ -344,6 +366,25 @@ export default function HubAnimateur() {
 
             </div>
           ))}
+        </div>
+
+        {/* Surprise Cater */}
+        <div className="mt-6 bg-gradient-to-r from-pink-900/40 via-purple-900/40 to-rose-900/40 border border-pink-500/30 rounded-2xl p-4">
+          <p className="text-xs text-pink-300/60 font-semibold mb-3 text-center uppercase tracking-wider">🔒 Surprise privée</p>
+          <button
+            onClick={handleTriggerCloture}
+            disabled={cloture}
+            className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-400 hover:to-purple-400 disabled:opacity-50 text-white font-black text-lg rounded-xl py-4 transition-all active:scale-95 mb-2"
+          >
+            🎂 Déclencher la surprise pour Cater
+          </button>
+          <button
+            onClick={handleResetCloture}
+            disabled={!cloture}
+            className="w-full text-xs text-pink-300/50 hover:text-pink-300 disabled:opacity-30 transition-colors py-1"
+          >
+            ↺ Réinitialiser la surprise
+          </button>
         </div>
 
         <div className="mt-8 text-center">
