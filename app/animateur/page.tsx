@@ -56,18 +56,25 @@ export default function HubAnimateur() {
   const [jeuxData, setJeuxData]   = useState<JeuData[]>([])
   const [revealing, setRevealing] = useState<string | null>(null)
   const [paused, setPaused]       = useState(false)
-  const initialized = useRef(false)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [connected, setConnected] = useState<Record<string, number>>({})
+  const initialized  = useRef(false)
+  const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
+  const roomIdsRef   = useRef<Record<string, string>>({})
 
   const fetchStatuses = async () => {
     const { data } = await supabase
       .from('rooms')
-      .select('code, status')
+      .select('id, code, status')
       .in('code', ROOM_CODES)
     if (data) {
-      const map: Record<string, string> = {}
-      for (const row of data) map[row.code] = row.status
-      setStatuses(map)
+      const statusMap: Record<string, string> = {}
+      const idMap: Record<string, string> = {}
+      for (const row of data) {
+        statusMap[row.code] = row.status
+        idMap[row.code]     = row.id
+      }
+      setStatuses(statusMap)
+      roomIdsRef.current = idMap
     }
   }
 
@@ -77,6 +84,24 @@ export default function HubAnimateur() {
       .select('slug, visible, ordre')
       .order('ordre', { ascending: true })
     if (data) setJeuxData(data as JeuData[])
+  }
+
+  const fetchConnected = async () => {
+    const roomIds = Object.values(roomIdsRef.current)
+    if (roomIds.length === 0) return
+    const cutoff = new Date(Date.now() - 10_000).toISOString()
+    const { data } = await supabase
+      .from('players')
+      .select('room_id')
+      .in('room_id', roomIds)
+      .gt('last_seen', cutoff)
+    if (!data) return
+    const counts: Record<string, number> = {}
+    for (const p of data) counts[p.room_id] = (counts[p.room_id] ?? 0) + 1
+    const byCod: Record<string, number> = {}
+    for (const [code, rid] of Object.entries(roomIdsRef.current))
+      byCod[code] = counts[rid] ?? 0
+    setConnected(byCod)
   }
 
   const fetchPause = async () => {
@@ -91,13 +116,14 @@ export default function HubAnimateur() {
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
-    fetchStatuses()
+    fetchStatuses().then(fetchConnected)
     fetchJeuxVisibles()
     fetchPause()
     intervalRef.current = setInterval(() => {
       fetchStatuses()
       fetchJeuxVisibles()
       fetchPause()
+      fetchConnected()
     }, 3000)
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
@@ -264,7 +290,7 @@ export default function HubAnimateur() {
           {JEUX.map(jeu => (
             <div key={jeu.num} className="bg-white/5 border border-white/10 rounded-2xl p-4">
 
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-3 mb-2">
                 <span className="text-2xl w-9 text-center">{jeu.emoji}</span>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
@@ -274,6 +300,18 @@ export default function HubAnimateur() {
                 </div>
                 <StatusBadge status={jeu.code ? statuses[jeu.code] : undefined} />
               </div>
+
+              {jeu.code != null && connected[jeu.code] !== undefined && (
+                <div className="mb-3 pl-[2.25rem]">
+                  {(connected[jeu.code] ?? 0) > 0 ? (
+                    <span className="text-xs font-semibold text-green-400">
+                      🟢 {connected[jeu.code]} connecté{(connected[jeu.code] ?? 0) > 1 ? 's' : ''}
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold text-white/25">○ 0 connecté</span>
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-2">
                 <a
