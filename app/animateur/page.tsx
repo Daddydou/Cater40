@@ -56,7 +56,6 @@ export default function HubAnimateur() {
   const [revealing, setRevealing] = useState<string | null>(null)
   const [paused, setPaused]       = useState(false)
   const [cloture, setCloture]     = useState(false)
-  const [connected, setConnected] = useState<Record<string, number>>({})
   const initialized  = useRef(false)
   const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null)
   const roomIdsRef   = useRef<Record<string, string>>({})
@@ -86,24 +85,6 @@ export default function HubAnimateur() {
     if (data) setJeuxData(data as JeuData[])
   }
 
-  const fetchConnected = async () => {
-    const roomIds = Object.values(roomIdsRef.current)
-    if (roomIds.length === 0) return
-    const cutoff = new Date(Date.now() - 10_000).toISOString()
-    const { data } = await supabase
-      .from('players')
-      .select('room_id')
-      .in('room_id', roomIds)
-      .gt('last_seen', cutoff)
-    if (!data) return
-    const counts: Record<string, number> = {}
-    for (const p of data) counts[p.room_id] = (counts[p.room_id] ?? 0) + 1
-    const byCod: Record<string, number> = {}
-    for (const [code, rid] of Object.entries(roomIdsRef.current))
-      byCod[code] = counts[rid] ?? 0
-    setConnected(byCod)
-  }
-
   const fetchPause = async () => {
     const { data } = await supabase
       .from('app_state')
@@ -125,7 +106,7 @@ export default function HubAnimateur() {
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
-    fetchStatuses().then(fetchConnected)
+    fetchStatuses()
     fetchJeuxVisibles()
     fetchPause()
     fetchCloture()
@@ -133,7 +114,6 @@ export default function HubAnimateur() {
       fetchStatuses()
       fetchJeuxVisibles()
       fetchPause()
-      fetchConnected()
       fetchCloture()
     }, 3000)
     return () => {
@@ -323,18 +303,6 @@ export default function HubAnimateur() {
                 </div>
                 <StatusBadge status={jeu.code ? statuses[jeu.code] : undefined} />
               </div>
-
-              {jeu.code != null && connected[jeu.code] !== undefined && (
-                <div className="mb-3 pl-[2.25rem]">
-                  {(connected[jeu.code] ?? 0) > 0 ? (
-                    <span className="text-xs font-semibold text-green-400">
-                      🟢 {connected[jeu.code]} connecté{(connected[jeu.code] ?? 0) > 1 ? 's' : ''}
-                    </span>
-                  ) : (
-                    <span className="text-xs font-semibold text-white/25">○ 0 connecté</span>
-                  )}
-                </div>
-              )}
 
               <div className="flex gap-2">
                 <a
