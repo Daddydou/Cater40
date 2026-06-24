@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { FRIENDS_QUESTIONS } from '@/lib/friends-quiz-data'
+import { computeRanking } from '@/lib/friends-ranking'
 import PlayerAvatar from '@/lib/components/PlayerAvatar'
 import Link from 'next/link'
 
@@ -16,10 +17,11 @@ type GameState = {
   status: 'waiting' | 'playing' | 'finished'
   current_question_id: number | null
   question_open: boolean
+  reveal_count: number
 }
 
-type Player  = { id: string; name: string; score: number; avatar_url?: string | null }
-type Answer  = {
+type Player = { id: string; name: string; score: number; avatar_url?: string | null }
+type Answer = {
   id: string
   player_id: string
   player_name: string
@@ -35,6 +37,7 @@ export default function QuizzFriendsAnimateur() {
   const [players, setPlayers]     = useState<Player[]>([])
   const [answers, setAnswers]     = useState<Answer[]>([])
   const [passedIds, setPassedIds] = useState<number[]>([])
+  const [revealCount, setRevealCount] = useState(0)
   const [loading, setLoading]     = useState(true)
   const initialized = useRef(false)
 
@@ -46,6 +49,7 @@ export default function QuizzFriendsAnimateur() {
     ])
     if (gsRes.data) {
       setGameState(gsRes.data as GameState)
+      setRevealCount(gsRes.data.reveal_count ?? 0)
       if (gsRes.data.current_question_id && !gsRes.data.question_open) {
         setPassedIds(prev => prev.includes(gsRes.data!.current_question_id!) ? prev : [...prev, gsRes.data!.current_question_id!])
       }
@@ -126,6 +130,23 @@ export default function QuizzFriendsAnimateur() {
     await fetchAll(roomId)
   }
 
+  const handleRevealNext = async () => {
+    if (!roomId || revealCount >= players.length) return
+    const next = revealCount + 1
+    await supabase.from('friends_game')
+      .update({ reveal_count: next, updated_at: new Date().toISOString() })
+      .eq('room_id', roomId)
+    setRevealCount(next)
+  }
+
+  const handleRevealAll = async () => {
+    if (!roomId || players.length === 0) return
+    await supabase.from('friends_game')
+      .update({ reveal_count: players.length, updated_at: new Date().toISOString() })
+      .eq('room_id', roomId)
+    setRevealCount(players.length)
+  }
+
   const handleReset = async () => {
     if (!confirm('Nouvelle partie ? Tous les joueurs et réponses seront supprimés.')) return
     await supabase.rpc('reset_room', { p_code: ROOM_CODE })
@@ -137,6 +158,7 @@ export default function QuizzFriendsAnimateur() {
     setAnswers([])
     setPassedIds([])
     setPlayers([])
+    setRevealCount(0)
   }
 
   const currentQuestion = gameState?.current_question_id
@@ -156,6 +178,10 @@ export default function QuizzFriendsAnimateur() {
 
   const gameUrl       = typeof window !== 'undefined' ? `${window.location.origin}/quizz-friends` : ''
   const classementUrl = typeof window !== 'undefined' ? `${window.location.origin}/quizz-friends/classement` : ''
+
+  // Classement calculé (disponible dès que status=finished)
+  const rankedPlayers = gameState?.status === 'finished' ? computeRanking(players, answers) : []
+  const allRevealed   = revealCount >= players.length
 
   if (loading) return (
     <main className="min-h-screen bg-[#1a0a2e] flex items-center justify-center text-white">
@@ -268,7 +294,6 @@ export default function QuizzFriendsAnimateur() {
                 </div>
                 <p className="text-sm font-medium">{currentQuestion.question}</p>
 
-                {/* Liste des réponses à valider */}
                 <div className="space-y-2">
                   {answersForCurrentQ.length === 0 ? (
                     <p className="text-white/30 text-sm text-center py-3">Aucune réponse encore…</p>
@@ -355,14 +380,85 @@ export default function QuizzFriendsAnimateur() {
           </div>
         )}
 
-        {/* Phase terminée */}
+        {/* Phase terminée — pilotage du reveal */}
         {gameState?.status === 'finished' && (
-          <a
-            href="/quizz-friends/classement"
-            className="block w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-4 text-center text-lg transition-all active:scale-95"
-          >
-            🏆 Ouvrir le classement final
-          </a>
+          <div className="space-y-4">
+
+            {/* Panneau classement + contrôles reveal */}
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-yellow-300 text-xs font-semibold uppercase tracking-wide">
+                  🏆 Classement final — pilotage
+                </p>
+                <span className="text-white/50 text-sm font-mono">
+                  {revealCount} / {players.length} révélés
+                </span>
+              </div>
+
+              {/* Liste ordonnée (meilleur en haut = révélé en dernier) */}
+              <div className="space-y-1.5">
+                {rankedPlayers.map((p, i) => {
+                  const N = rankedPlayers.length
+                  const isRevealed = revealCount >= N - i
+                  const medal = i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`
+                  return (
+                    <div key={p.id} className={`flex items-center justify-between rounded-xl px-3 py-2 border transition-all ${
+                      isRevealed
+                        ? 'bg-white/8 border-white/15'
+                        : 'bg-white/3 border-white/5 opacity-50'
+                    }`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm w-6 flex-shrink-0">{medal}</span>
+                        <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={24} />
+                        <span className="text-sm truncate">{p.name}</span>
+                        {p.isCater && (
+                          <span className="text-yellow-400 text-xs flex-shrink-0">★</span>
+                        )}
+                        {!isRevealed && (
+                          <span className="text-white/25 text-xs flex-shrink-0">masqué</span>
+                        )}
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-2">
+                        <span className="text-white text-sm font-bold tabular-nums">{p.finalScore} pts</span>
+                        {p.isCater && p.bonus > 0 && (
+                          <span className="text-yellow-400/60 text-xs block">+{p.bonus} beauté</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Boutons reveal */}
+              <div className="space-y-2 pt-1">
+                <button
+                  onClick={handleRevealNext}
+                  disabled={allRevealed}
+                  className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-3 text-sm disabled:opacity-30 transition-all active:scale-95"
+                >
+                  Révéler le joueur suivant →
+                </button>
+                <button
+                  onClick={handleRevealAll}
+                  disabled={allRevealed}
+                  className="w-full bg-white/10 hover:bg-white/20 border border-white/20 font-semibold rounded-xl py-2.5 text-sm disabled:opacity-30 transition-all active:scale-95"
+                >
+                  ✨ Tout révéler
+                </button>
+              </div>
+            </div>
+
+            {/* Lien vers l'écran classement (projection) */}
+            <a
+              href="/quizz-friends/classement"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white/80 font-semibold rounded-xl py-3 text-sm transition-all"
+            >
+              📺 Ouvrir l&apos;écran classement (projection)
+            </a>
+
+          </div>
         )}
 
         {/* Reset */}

@@ -1,36 +1,18 @@
 'use client'
-// app/quizz-friends/classement/page.tsx
+// app/quizz-friends/classement/page.tsx — écran public (joueurs + projection)
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { computeRanking, RankedPlayer } from '@/lib/friends-ranking'
 import PlayerAvatar from '@/lib/components/PlayerAvatar'
 
 const ROOM_CODE = 'quizz-friends'
 
-type PlayerScore = {
-  id: string
-  name: string
-  avatar_url?: string | null
-  rawScore: number
-  bonus: number
-  finalScore: number
-  isCater: boolean
-}
-
 const FRIENDS_CONFETTI = ['☂️', '☕', '🛋️', '📺', '💛', '❤️', '💙', '🍕']
 const LETTERS = 'FRIENDS'.split('')
 
-function normalizePrenom(name: string): string {
-  return name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-}
-
-function isCaterPrenom(name: string): boolean {
-  const n = normalizePrenom(name)
-  return n.includes('cater') || n.includes('sophie')
-}
-
 export default function QuizzFriendsClassement() {
-  const [players, setPlayers]                     = useState<PlayerScore[]>([])
+  const [players, setPlayers]                     = useState<RankedPlayer[]>([])
   const [roomId, setRoomId]                       = useState<string | null>(null)
   const [revealCount, setRevealCount]             = useState(0)
   const [caterBonusVisible, setCaterBonusVisible] = useState(false)
@@ -38,9 +20,6 @@ export default function QuizzFriendsClassement() {
   const [showConfetti, setShowConfetti]           = useState(false)
   const [showMessage, setShowMessage]             = useState(false)
   const [loading, setLoading]                     = useState(true)
-  // Même mécanisme que /concours-ortho/classement : toggle local.
-  // Démarre à false (spectateur) pour que les joueurs ne voient aucun bouton.
-  const [isAnimateur, setIsAnimateur]             = useState(false)
 
   const caterAnimTriggered = useRef(false)
 
@@ -60,32 +39,10 @@ export default function QuizzFriendsClassement() {
 
       if (!playersData) { setLoading(false); return }
 
-      // Scores bruts
-      const rawScores: Record<string, number> = {}
-      for (const p of playersData) rawScores[p.id] = 0
-      for (const a of (answersData ?? [])) {
-        if (a.is_correct || a.validated) rawScores[a.player_id] = (rawScores[a.player_id] ?? 0) + 1
-      }
-
-      // Bonus Cater
-      const caterPlayer = playersData.find(p => isCaterPrenom(p.name))
-      const others       = playersData.filter(p => !isCaterPrenom(p.name))
-      const maxOthers    = others.length > 0
-        ? Math.max(...others.map(p => rawScores[p.id] ?? 0))
-        : 0
-
-      let bonus = 0
-      if (caterPlayer) {
-        const caterRaw = rawScores[caterPlayer.id] ?? 0
-        if (caterRaw < maxOthers) bonus = maxOthers - caterRaw + 1
-      }
-
-      const result: PlayerScore[] = playersData.map(p => {
-        const raw = rawScores[p.id] ?? 0
-        const ic  = isCaterPrenom(p.name)
-        return { id: p.id, name: p.name, avatar_url: p.avatar_url, rawScore: raw, bonus: ic ? bonus : 0, finalScore: raw + (ic ? bonus : 0), isCater: ic }
-      })
-      result.sort((a, b) => b.finalScore - a.finalScore)
+      const result = computeRanking(
+        playersData,
+        (answersData ?? []) as { player_id: string; is_correct: boolean | null; validated: boolean }[]
+      )
       setPlayers(result)
 
       const rc = gameData?.reveal_count ?? 0
@@ -105,7 +62,7 @@ export default function QuizzFriendsClassement() {
     load()
   }, [])
 
-  // Polling reveal_count toutes les 2s (joueurs passifs)
+  // Polling reveal_count toutes les 2s
   useEffect(() => {
     if (!roomId) return
     const poll = async () => {
@@ -133,24 +90,6 @@ export default function QuizzFriendsClassement() {
     }
   }, [revealCount, players])
 
-  // Animateur : révèle le joueur suivant (du pire au meilleur)
-  const handleRevealNext = async () => {
-    if (!roomId || revealCount >= players.length) return
-    const next = revealCount + 1
-    await supabase.from('friends_game')
-      .update({ reveal_count: next, updated_at: new Date().toISOString() })
-      .eq('room_id', roomId)
-    setRevealCount(next)
-  }
-
-  const handleRevealAll = async () => {
-    if (!roomId || players.length === 0) return
-    await supabase.from('friends_game')
-      .update({ reveal_count: players.length, updated_at: new Date().toISOString() })
-      .eq('room_id', roomId)
-    setRevealCount(players.length)
-  }
-
   // players[i] est révélé si revealCount >= players.length - i
   // i=0 → meilleur (Cater) → révélé en dernier
   // i=N-1 → pire → révélé en premier
@@ -173,8 +112,6 @@ export default function QuizzFriendsClassement() {
     </main>
   )
 
-  const allRevealed = revealCount >= players.length
-
   return (
     <main className="min-h-screen bg-[#1a0a2e] text-white p-5 overflow-hidden relative">
 
@@ -195,21 +132,13 @@ export default function QuizzFriendsClassement() {
           <p className="text-white/40 text-sm mt-1">Quizz Friends</p>
         </div>
 
-        {/* Toggle animateur — même pattern que /concours-ortho/classement */}
-        <button
-          onClick={() => setIsAnimateur(v => !v)}
-          className="w-full text-xs text-white/20 hover:text-white/40 transition-colors py-1"
-        >
-          {isAnimateur ? '👁 Mode animateur actif' : '🔒 Mode spectateur'}
-        </button>
-
         {/* Classement */}
         <div className="space-y-3">
           {players.map((p, i) => {
-            const rank          = i + 1
-            const shown         = isRevealed(i)
-            const medal         = rank === 1 ? '👑' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`
-            const bonusShown    = p.isCater && shown && caterBonusVisible
+            const rank       = i + 1
+            const shown      = isRevealed(i)
+            const medal      = rank === 1 ? '👑' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`
+            const bonusShown = p.isCater && shown && caterBonusVisible
 
             return (
               <div key={p.id} className="transition-all duration-500">
@@ -256,24 +185,6 @@ export default function QuizzFriendsClassement() {
             )
           })}
         </div>
-
-        {/* Boutons reveal — animateur uniquement */}
-        {isAnimateur && !allRevealed && (
-          <div className="space-y-2">
-            <button
-              onClick={handleRevealNext}
-              className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-3 transition-all active:scale-95"
-            >
-              Révéler le joueur suivant →
-            </button>
-            <button
-              onClick={handleRevealAll}
-              className="w-full bg-white/10 hover:bg-white/20 border border-white/20 font-semibold rounded-xl py-2.5 text-sm transition-all active:scale-95"
-            >
-              ✨ Tout révéler
-            </button>
-          </div>
-        )}
 
         {/* Message final */}
         {showMessage && (
