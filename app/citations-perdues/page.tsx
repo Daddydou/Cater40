@@ -170,6 +170,14 @@ export default function CitationsPerduesPage() {
     setTimeout(() => setBravoPhrase(null), 2500);
     await supabase.from('citations_game').update(updated).eq('id', session.id);
     if (toutesValidees) {
+      const toutesColorees = Object.keys(COLORED_LETTERS);
+      const dejaRevelees = session.lettres_colorees_revelees || [];
+      const manquantes = toutesColorees.filter(l => !dejaRevelees.includes(l));
+      if (manquantes.length > 0) {
+        const newColorees = [...dejaRevelees, ...manquantes];
+        setSession(prev => prev ? { ...prev, lettres_colorees_revelees: newColorees } : prev);
+        await supabase.from('citations_game').update({ lettres_colorees_revelees: newColorees }).eq('id', session.id);
+      }
       setTimeout(() => setJeuTermine(true), 1500);
     }
   };
