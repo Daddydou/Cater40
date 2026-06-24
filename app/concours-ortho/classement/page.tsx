@@ -1,7 +1,7 @@
 'use client'
 // app/concours-ortho/classement/page.tsx
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import PlayerAvatar from '@/lib/components/PlayerAvatar'
 
@@ -11,49 +11,79 @@ type Player = { id: string; name: string; score: number; avatar_url?: string | n
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
+function groupByScore(players: Player[]): Player[][] {
+  if (players.length === 0) return []
+  const groups: Player[][] = []
+  let currentGroup: Player[] = []
+  for (const p of players) {
+    if (currentGroup.length === 0 || p.score === currentGroup[0].score) {
+      currentGroup.push(p)
+    } else {
+      groups.push(currentGroup)
+      currentGroup = [p]
+    }
+  }
+  groups.push(currentGroup)
+  return groups
+}
+
 export default function ConcursOrthoClassement() {
-  const [players, setPlayers]       = useState<Player[]>([])
-  const [revealed, setRevealed]     = useState<Set<string>>(new Set())
+  const [players, setPlayers]           = useState<Player[]>([])
+  const [roomId, setRoomId]             = useState<string | null>(null)
+  const [revealCount, setRevealCount]   = useState(0)
   const [showConfetti, setShowConfetti] = useState(false)
   const [showMessage, setShowMessage]   = useState(false)
   const [loading, setLoading]           = useState(true)
-  const [isAnimateur, setIsAnimateur]   = useState(true)
+  const confettiTriggered = useRef(false)
 
-useEffect(() => {
-  const load = async () => {
-    const { data: room } = await supabase
-      .from('rooms').select('id').eq('code', ROOM_CODE).single()
-    if (!room) { console.log('Room non trouvée'); return }
+  useEffect(() => {
+    const load = async () => {
+      const { data: room } = await supabase
+        .from('rooms').select('id, reveal_count').eq('code', ROOM_CODE).single()
+      if (!room) { setLoading(false); return }
 
-    console.log('Room ID:', room.id)
+      setRoomId(room.id)
+      const rc = room.reveal_count ?? 0
+      setRevealCount(rc)
 
-    const { data, error } = await supabase
-      .from('players').select('id, name, score, avatar_url')
-      .eq('room_id', room.id)
-      .order('score', { ascending: true })
-    
-    console.log('Players:', data, 'Error:', error)
-    if (data) setPlayers(data)
-    setLoading(false)
-  }
-  load()
-}, [])
+      const { data } = await supabase
+        .from('players').select('id, name, score, avatar_url')
+        .eq('room_id', room.id).order('score', { ascending: false })
+      if (data) {
+        setPlayers(data)
+        const groups = groupByScore(data)
+        if (rc >= groups.length && groups.length > 0) {
+          confettiTriggered.current = true
+          setShowConfetti(true)
+          setShowMessage(true)
+        }
+      }
+      setLoading(false)
+    }
+    load()
+  }, [])
 
-  const handleReveal = (id: string) => {
-    const next = new Set(revealed)
-    next.add(id)
-    setRevealed(next)
-    if (next.size === players.length) {
+  // Polling reveal_count toutes les 2s
+  useEffect(() => {
+    if (!roomId) return
+    const id = setInterval(async () => {
+      const { data } = await supabase
+        .from('rooms').select('reveal_count').eq('id', roomId).single()
+      if (data?.reveal_count !== undefined) setRevealCount(data.reveal_count)
+    }, 2000)
+    return () => clearInterval(id)
+  }, [roomId])
+
+  // Déclencher confettis quand tout est révélé
+  useEffect(() => {
+    if (players.length === 0 || confettiTriggered.current) return
+    const groups = groupByScore(players)
+    if (revealCount >= groups.length && groups.length > 0) {
+      confettiTriggered.current = true
       setTimeout(() => { setShowConfetti(true); setShowMessage(true) }, 600)
     }
-  }
+  }, [revealCount, players])
 
-  const handleRevealAll = () => {
-    setRevealed(new Set(players.map(p => p.id)))
-    setTimeout(() => { setShowConfetti(true); setShowMessage(true) }, 600)
-  }
-
-  // Confettis lettres + ananas
   const confettiPieces = showConfetti
     ? Array.from({ length: 40 }, (_, i) => ({
         id: i,
@@ -71,13 +101,15 @@ useEffect(() => {
     </main>
   )
 
-  // Classement inversé pour l'affichage (meilleur en haut quand révélé)
-  const displayOrder = [...players].reverse()
+  const groups = groupByScore(players)
+  const totalGroups = groups.length
+  // groups[0] = meilleur (révélé en dernier) — groups[N-1] = pire (révélé en premier)
+  const isGroupRevealed = (gi: number) => revealCount >= totalGroups - gi
 
   return (
     <main className="min-h-screen bg-[#0B3D3A] text-white p-5 overflow-hidden relative">
 
-      {/* Confettis */}
+      {/* Confettis lettres + ananas */}
       {confettiPieces.map(p => (
         <span
           key={p.id}
@@ -101,68 +133,48 @@ useEffect(() => {
           <p className="text-white/40 text-sm mt-1">Concours Ortho</p>
         </div>
 
-        {/* Toggle animateur */}
-        <button
-          onClick={() => setIsAnimateur(v => !v)}
-          className="w-full text-xs text-white/20 hover:text-white/40 transition-colors py-1"
-        >
-          {isAnimateur ? '👁 Mode animateur actif' : '🔒 Mode spectateur'}
-        </button>
-
-        {/* Podium / liste */}
+        {/* Classement par groupes */}
         <div className="space-y-3">
-          {displayOrder.map((p, i) => {
-            const rank    = displayOrder.length - i
-            const isShown = revealed.has(p.id) || !isAnimateur
-            const medal   = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`
+          {groups.map((group, gi) => {
+            const rank  = gi + 1
+            const shown = isGroupRevealed(gi)
+            const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`
+
+            if (!shown) {
+              return (
+                <div key={gi} className="h-16 bg-white/3 border border-white/5 rounded-2xl flex items-center justify-center">
+                  <span className="text-white/20 text-sm">???</span>
+                </div>
+              )
+            }
 
             return (
               <div
-                key={p.id}
-                className={`transition-all duration-500 ${isShown ? 'pop-in' : 'opacity-0 scale-95'}`}
+                key={gi}
+                className={`rounded-2xl p-4 border pop-in ${
+                  rank === 1
+                    ? 'bg-yellow-500/10 border-yellow-500/30'
+                    : 'bg-white/5 border-white/10'
+                }`}
               >
-                {isShown ? (
-                  <div className={`flex items-center justify-between rounded-2xl p-4 border ${
-                    rank === 1
-                      ? 'bg-yellow-500/10 border-yellow-500/30'
-                      : 'bg-white/5 border-white/10'
-                  }`}>
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{medal}</span>
-                      <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={36} />
-                      <span className="font-semibold text-lg">{p.name}</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{medal}</span>
+                    <div className="space-y-1">
+                      {group.map(p => (
+                        <div key={p.id} className="flex items-center gap-2">
+                          <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={36} />
+                          <span className="font-semibold text-lg">{p.name}</span>
+                        </div>
+                      ))}
                     </div>
-                    <span className="text-2xl font-bold tabular-nums">{p.score} pts</span>
                   </div>
-                ) : (
-                  <div className="h-16 bg-white/3 border border-white/5 rounded-2xl flex items-center justify-center">
-                    <span className="text-white/20 text-sm">???</span>
-                  </div>
-                )}
-
-                {/* Bouton révéler (animateur uniquement) */}
-                {isAnimateur && !isShown && (
-                  <button
-                    onClick={() => handleReveal(p.id)}
-                    className="w-full mt-1 bg-teal-500/20 hover:bg-teal-500/40 border border-teal-500/30 text-teal-300 text-sm font-semibold rounded-xl py-2 transition-all active:scale-95"
-                  >
-                    Révéler →
-                  </button>
-                )}
+                  <span className="text-2xl font-bold tabular-nums">{group[0].score} pts</span>
+                </div>
               </div>
             )
           })}
         </div>
-
-        {/* Bouton tout révéler */}
-        {isAnimateur && revealed.size < players.length && (
-          <button
-            onClick={handleRevealAll}
-            className="w-full bg-white/10 hover:bg-white/20 border border-white/20 font-semibold rounded-xl py-3 transition-all active:scale-95"
-          >
-            ✨ Tout révéler
-          </button>
-        )}
 
         {/* Message final */}
         {showMessage && (

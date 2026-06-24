@@ -8,6 +8,7 @@ import PlayerAvatar from '@/lib/components/PlayerAvatar'
 import Link from 'next/link'
 
 const ROOM_CODE = 'concours-ortho'
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 type Question = {
   id: string
@@ -25,11 +26,25 @@ type Reponse = {
   player_id: string
   reponse: string
   is_correct: boolean | null
-  players: { name: string }
-  ortho_questions: { question: string }
 }
 
 type Player = { id: string; name: string; score: number; avatar_url?: string | null }
+
+function groupByScore(players: Player[]): Player[][] {
+  if (players.length === 0) return []
+  const groups: Player[][] = []
+  let currentGroup: Player[] = []
+  for (const p of players) {
+    if (currentGroup.length === 0 || p.score === currentGroup[0].score) {
+      currentGroup.push(p)
+    } else {
+      groups.push(currentGroup)
+      currentGroup = [p]
+    }
+  }
+  groups.push(currentGroup)
+  return groups
+}
 
 export default function ConcursOrthoAnimateur() {
   const [roomId, setRoomId]         = useState<string | null>(null)
@@ -37,10 +52,12 @@ export default function ConcursOrthoAnimateur() {
   const [questions, setQuestions]   = useState<Question[]>([])
   const [players, setPlayers]       = useState<Player[]>([])
   const [reponses, setReponses]     = useState<Reponse[]>([])
-  const [phase, setPhase]                         = useState<'setup' | 'questions' | 'correction' | 'classement'>('setup')
-  const [currentQuestionLibreIdx, setCurrentQuestionLibreIdx] = useState(0)
-  const [bonneReponseAnim, setBonneReponseAnim]   = useState<string | null>(null)
-  const [loading, setLoading]                     = useState(true)
+  const [phase, setPhase]           = useState<'setup' | 'questions' | 'classement'>('setup')
+  const [bonneReponseAnim, setBonneReponseAnim] = useState<string | null>(null)
+  const [loading, setLoading]       = useState(true)
+  const [revealCount, setRevealCount]   = useState(0)
+  const [showConfetti, setShowConfetti] = useState(false)
+  const [showMessage, setShowMessage]   = useState(false)
   const initialized = useRef(false)
 
   const fetchPlayers = useCallback(async (rid: string) => {
@@ -60,9 +77,9 @@ export default function ConcursOrthoAnimateur() {
   const fetchReponses = useCallback(async (rid: string) => {
     const { data } = await supabase
       .from('ortho_reponses')
-      .select('id, question_id, player_id, reponse, is_correct, players(name), ortho_questions(question)')
+      .select('id, question_id, player_id, reponse, is_correct')
       .eq('room_id', rid)
-    if (data) setReponses(data as unknown as Reponse[])
+    if (data) setReponses(data as Reponse[])
   }, [])
 
   useEffect(() => {
@@ -144,39 +161,52 @@ export default function ConcursOrthoAnimateur() {
     }
   }
 
-  const handleCorrectLibre = async (reponseId: string, correct: boolean, playerId: string) => {
-    await supabase.from('ortho_reponses')
-      .update({ is_correct: correct }).eq('id', reponseId)
-    if (correct && roomId) {
-      const player = players.find(p => p.id === playerId)
-      if (player) {
-        await supabase.from('players')
-          .update({ score: player.score + 1 }).eq('id', playerId)
-        await fetchPlayers(roomId)
-      }
-    }
-    await fetchReponses(roomId!)
-  }
-
   const handleLaunchClassement = async () => {
     if (!roomId) return
     await supabase.from('rooms').update({ status: 'finished' }).eq('id', roomId)
     setRoomStatus('finished')
+    await fetchPlayers(roomId)
     setPhase('classement')
+  }
+
+  const handleRevealNext = async () => {
+    if (!roomId) return
+    const sortedPlayers = [...players].sort((a, b) => b.score - a.score)
+    const groups = groupByScore(sortedPlayers)
+    const next = Math.min(revealCount + 1, groups.length)
+    await supabase.from('rooms').update({ reveal_count: next }).eq('id', roomId)
+    setRevealCount(next)
+    if (next >= groups.length) {
+      setTimeout(() => { setShowConfetti(true); setShowMessage(true) }, 600)
+    }
+  }
+
+  const handleRevealAll = async () => {
+    if (!roomId) return
+    const sortedPlayers = [...players].sort((a, b) => b.score - a.score)
+    const groups = groupByScore(sortedPlayers)
+    await supabase.from('rooms').update({ reveal_count: groups.length }).eq('id', roomId)
+    setRevealCount(groups.length)
+    setTimeout(() => { setShowConfetti(true); setShowMessage(true) }, 600)
   }
 
   const handleReset = async () => {
     if (!confirm('Remettre à zéro ? Tout sera supprimé.')) return
     await supabase.rpc('reset_room', { p_code: ROOM_CODE })
     if (roomId) {
-      await supabase.from('ortho_questions').delete().eq('room_id', roomId)
-      await supabase.from('ortho_reponses').delete().eq('room_id', roomId)
+      await Promise.all([
+        supabase.from('ortho_questions').delete().eq('room_id', roomId),
+        supabase.from('ortho_reponses').delete().eq('room_id', roomId),
+        supabase.from('rooms').update({ reveal_count: 0 }).eq('id', roomId),
+      ])
     }
     setPlayers([]); setQuestions([]); setReponses([])
+    setRevealCount(0); setShowConfetti(false); setShowMessage(false)
     setRoomStatus('waiting'); setPhase('setup')
   }
 
   const activeQ = questions.find(q => q.status === 'active')
+  const allClosed = questions.length > 0 && !activeQ && questions.every(q => q.status === 'closed')
 
   const getQuestionLabel = (q: Question) => {
     if (q.question.includes("Chassez l'intrus") && q.propositions) {
@@ -185,9 +215,19 @@ export default function ConcursOrthoAnimateur() {
     return q.question
   }
 
-  console.log('phase actuelle:', phase, 'questions:', questions.map(q => q.status))
-  const gameUrl = typeof window !== 'undefined' ? `${window.location.origin}/concours-ortho` : ''
+  const gameUrl       = typeof window !== 'undefined' ? `${window.location.origin}/concours-ortho` : ''
   const classementUrl = typeof window !== 'undefined' ? `${window.location.origin}/concours-ortho/classement` : ''
+
+  const confettiPieces = showConfetti
+    ? Array.from({ length: 40 }, (_, i) => ({
+        id: i,
+        char: i % 3 === 0 ? '🍍' : LETTERS[i % LETTERS.length],
+        left: Math.random() * 100,
+        delay: Math.random() * 3,
+        duration: 3 + Math.random() * 2,
+        size: 16 + Math.random() * 16,
+      }))
+    : []
 
   if (loading) return (
     <main className="min-h-screen bg-[#0B3D3A] flex items-center justify-center text-white">
@@ -196,8 +236,17 @@ export default function ConcursOrthoAnimateur() {
   )
 
   return (
-    <main className="min-h-screen bg-[#0B3D3A] text-white p-5">
-      <div className="max-w-lg mx-auto space-y-5">
+    <main className="min-h-screen bg-[#0B3D3A] text-white p-5 relative overflow-hidden">
+
+      {/* Confettis */}
+      {confettiPieces.map(p => (
+        <span key={p.id} className="letter-confetti select-none pointer-events-none"
+          style={{ left: `${p.left}%`, fontSize: p.size, animationDuration: `${p.duration}s`, animationDelay: `${p.delay}s` }}>
+          {p.char}
+        </span>
+      ))}
+
+      <div className="max-w-lg mx-auto space-y-5 relative z-10">
 
         {/* Header */}
         <div className="flex items-center justify-between pt-2">
@@ -257,21 +306,29 @@ export default function ConcursOrthoAnimateur() {
           <div className="space-y-3">
             <p className="text-white/40 text-xs uppercase tracking-wide">Questions</p>
 
-            {activeQ && (
-              <div className="bg-teal-500/10 border border-teal-500/30 rounded-2xl p-4 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-teal-300 text-xs font-semibold">▶️ EN COURS — Q{activeQ.ordre}</span>
+            {/* Question en cours */}
+            {activeQ && (() => {
+              const reponsesQ = reponses.filter(r => r.question_id === activeQ.id)
+              return (
+                <div className="bg-teal-500/10 border border-teal-500/30 rounded-2xl p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-teal-300 text-xs font-semibold">▶️ EN COURS — Q{activeQ.ordre}</span>
+                  </div>
+                  <p className="text-sm">{getQuestionLabel(activeQ)}</p>
+                  <button
+                    onClick={handleCloseQuestion}
+                    className="w-full bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl py-2 text-sm font-semibold transition-all active:scale-95"
+                  >
+                    ⏹ Fermer cette question
+                  </button>
+                  <p className="text-center text-white/50 text-sm">
+                    💬 {reponsesQ.length} / {players.length} réponses
+                  </p>
                 </div>
-                <p className="text-sm">{getQuestionLabel(activeQ)}</p>
-                <button
-                  onClick={handleCloseQuestion}
-                  className="w-full bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl py-2 text-sm font-semibold transition-all active:scale-95"
-                >
-                  ⏹ Fermer cette question
-                </button>
-              </div>
-            )}
+              )
+            })()}
 
+            {/* Bonne réponse */}
             {bonneReponseAnim && (
               <div className="bg-green-900/60 border border-green-500/50 rounded-2xl p-4 text-center space-y-2">
                 <p className="text-green-300 text-xs font-bold uppercase tracking-widest">✅ Bonne réponse :</p>
@@ -279,25 +336,20 @@ export default function ConcursOrthoAnimateur() {
               </div>
             )}
 
+            {/* Questions en attente */}
             {questions
               .filter(q => q.status === 'pending')
               .sort((a, b) => a.ordre - b.ordre)
               .map(q => (
-              <div key={q.id} className={`bg-white/5 border rounded-xl p-3 flex items-start justify-between gap-3 ${
-                q.status === 'active' ? 'border-teal-500/30 opacity-50' :
-                q.status === 'closed' ? 'border-white/5 opacity-40' : 'border-white/10'
-              }`}>
+              <div key={q.id} className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs text-white/30">Q{q.ordre}</span>
-                    <span className="text-xs bg-white/10 px-1.5 py-0.5 rounded text-white/50">
-                      {q.type === 'qcm' ? 'QCM' : 'Libre'}
-                    </span>
-                    {q.status === 'closed' && <span className="text-xs text-white/30">✓ Terminée</span>}
+                    <span className="text-xs bg-white/10 px-1.5 py-0.5 rounded text-white/50">QCM</span>
                   </div>
                   <p className="text-sm text-white/80 line-clamp-2">{getQuestionLabel(q)}</p>
                 </div>
-                {q.status === 'pending' && !activeQ && (
+                {!activeQ && (
                   <button
                     onClick={() => handleLaunchQuestion(q)}
                     className="flex-shrink-0 bg-teal-500 hover:bg-teal-400 text-white text-xs font-bold px-3 py-2 rounded-lg transition-all active:scale-95"
@@ -308,126 +360,108 @@ export default function ConcursOrthoAnimateur() {
               </div>
             ))}
 
-            {questions.length > 0 && !activeQ && questions.some(q => q.type === 'libre') && (
+            {/* Questions terminées (résumé) */}
+            {questions.filter(q => q.status === 'closed').length > 0 && (
+              <p className="text-white/25 text-xs text-center">
+                ✓ {questions.filter(q => q.status === 'closed').length} question(s) terminée(s)
+              </p>
+            )}
+
+            {/* Bouton lancer classement */}
+            {allClosed && (
               <button
-                onClick={() => {
-                  console.log('=== ENTREE CORRECTION ===')
-                  console.log('questions:', questions)
-                  console.log('reponses avant fetch:', reponses)
-                  fetchReponses(roomId!)
-                  console.log('reponses apres fetch:', reponses)
-                  setPhase('correction')
-                  setCurrentQuestionLibreIdx(0)
-                }}
-                className="w-full bg-blue-500 hover:bg-blue-400 text-white font-bold rounded-xl py-4 transition-all active:scale-95"
+                onClick={handleLaunchClassement}
+                className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-4 transition-all active:scale-95"
               >
-                🔍 Passer à la correction des réponses libres
+                🏆 Lancer le classement final
               </button>
             )}
           </div>
         )}
 
-        {/* Phase correction */}
-        {phase === 'correction' && (() => {
-          const questionsLibres = questions.filter(q => q.type === 'libre')
-          console.log('questionsLibres count:', questionsLibres.length, 'tous les types:', questions.map(q => ({ ordre: q.ordre, type: q.type })))
-          const currentQ = questionsLibres[currentQuestionLibreIdx]
-          const reponsesQ = currentQ ? reponses.filter(r => r.question_id === currentQ.id) : []
-          const allCorrected = reponsesQ.length === 0 || reponsesQ.every(r => r.is_correct !== null)
-          const isLast = currentQuestionLibreIdx >= questionsLibres.length - 1
+        {/* Phase classement */}
+        {phase === 'classement' && (() => {
+          const sortedPlayers = [...players].sort((a, b) => b.score - a.score)
+          const groups = groupByScore(sortedPlayers)
+          const totalGroups = groups.length
+          const allRevealed = revealCount >= totalGroups && totalGroups > 0
 
           return (
-            <div className="space-y-3">
-              {/* Compteur */}
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <p className="text-white/40 text-xs uppercase tracking-wide">Correction — réponses libres</p>
+                <p className="text-white/40 text-xs uppercase tracking-wide">Classement final</p>
                 <span className="text-white/30 text-xs font-mono">
-                  {currentQuestionLibreIdx + 1} / {questionsLibres.length}
+                  {revealCount} / {totalGroups} révélés
                 </span>
               </div>
 
-              {/* Texte de la question */}
-              {currentQ && (
-                <div className="bg-teal-500/10 border border-teal-500/30 rounded-2xl px-4 py-3">
-                  <p className="text-teal-300 text-xs font-semibold mb-1">Q{currentQ.ordre} — Réponse libre</p>
-                  <p className="text-sm text-white">{currentQ.question}</p>
-                </div>
-              )}
+              {/* Lien vers la page spectateur */}
+              <a
+                href="/concours-ortho/classement"
+                target="_blank"
+                className="block w-full text-center bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 text-sm font-semibold rounded-xl py-2.5 transition-all"
+              >
+                📺 Ouvrir l&apos;écran classement (projection)
+              </a>
 
-              {/* Réponses des joueurs */}
-              {reponsesQ.length === 0 && (
-                <p className="text-white/25 text-sm text-center py-3">Aucune réponse pour cette question</p>
-              )}
-
-              {reponsesQ.map(r => {
-                const nom = (r.players as { name?: string })?.name ?? '?'
-                const questionTexte = (r.ortho_questions as { question?: string })?.question
-                return (
-                  <div key={r.id} className={`border rounded-xl p-3 space-y-2 transition-colors ${
-                    r.is_correct === true  ? 'bg-green-500/10 border-green-500/30' :
-                    r.is_correct === false ? 'bg-red-500/10   border-red-500/30'   :
-                                             'bg-white/5      border-white/10'
-                  }`}>
-                    {questionTexte && (
-                      <p className="text-white/30 text-xs italic border-b border-white/10 pb-2">{questionTexte}</p>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <p className="text-white/50 text-xs font-semibold">{nom}</p>
-                      {r.is_correct === true  && <span className="text-green-400 text-xs">✅ Valide</span>}
-                      {r.is_correct === false && <span className="text-red-400   text-xs">❌ Incorrect</span>}
-                    </div>
-                    <p className="text-sm font-medium">&quot;{r.reponse}&quot;</p>
-                    {r.is_correct === null && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleCorrectLibre(r.id, true, r.player_id)}
-                          className="flex-1 bg-green-500/20 hover:bg-green-500/40 border border-green-500/30 text-green-300 text-sm font-semibold rounded-lg py-2 transition-all active:scale-95"
-                        >
-                          ✅ Valide
-                        </button>
-                        <button
-                          onClick={() => handleCorrectLibre(r.id, false, r.player_id)}
-                          className="flex-1 bg-red-500/20 hover:bg-red-500/40 border border-red-500/30 text-red-300 text-sm font-semibold rounded-lg py-2 transition-all active:scale-95"
-                        >
-                          ❌ Incorrect
-                        </button>
+              {/* Classement complet — tous visibles pour l'animateur */}
+              <div className="space-y-2">
+                {groups.map((group, gi) => {
+                  const rank     = gi + 1
+                  const revealed = revealCount >= totalGroups - gi
+                  const medal    = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`
+                  return (
+                    <div key={gi} className={`rounded-xl p-3 border transition-all duration-300 ${
+                      revealed ? 'bg-white/8 border-white/15' : 'bg-white/3 border-white/5 opacity-40'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">{medal}</span>
+                          <div>
+                            {group.map(p => (
+                              <div key={p.id} className="flex items-center gap-2">
+                                <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={24} />
+                                <span className="text-sm font-medium">{p.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {!revealed && <span className="text-white/25 text-xs ml-2">masqué</span>}
+                        </div>
+                        <span className="font-bold tabular-nums">{group[0].score} pts</span>
                       </div>
-                    )}
-                  </div>
-                )
-              })}
+                    </div>
+                  )
+                })}
+              </div>
 
-              {/* Navigation */}
-              {allCorrected && !isLast && (
-                <button
-                  onClick={() => setCurrentQuestionLibreIdx(i => i + 1)}
-                  className="w-full bg-blue-500 hover:bg-blue-400 text-white font-bold rounded-xl py-4 transition-all active:scale-95"
-                >
-                  Question suivante →
-                </button>
-              )}
+              {/* Boutons révélation */}
+              <button
+                onClick={handleRevealNext}
+                disabled={allRevealed}
+                className="w-full bg-teal-500 hover:bg-teal-400 text-white font-bold rounded-xl py-3 disabled:opacity-30 transition-all active:scale-95"
+              >
+                Révéler le suivant →
+              </button>
+              <button
+                onClick={handleRevealAll}
+                disabled={allRevealed}
+                className="w-full bg-white/10 hover:bg-white/20 border border-white/20 font-semibold rounded-xl py-3 disabled:opacity-30 transition-all active:scale-95"
+              >
+                ✨ Tout révéler
+              </button>
 
-              {allCorrected && isLast && (
-                <button
-                  onClick={handleLaunchClassement}
-                  className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-4 transition-all active:scale-95"
-                >
-                  🏆 Lancer le classement final
-                </button>
+              {/* Message final */}
+              {showMessage && (
+                <div className="text-center py-6 space-y-3 pop-in">
+                  <p className="text-2xl font-bold leading-snug">
+                    Envie d&apos;engager une autre personne dans ton cabinet ?
+                  </p>
+                  <p className="text-4xl">😄</p>
+                </div>
               )}
             </div>
           )
         })()}
-
-        {/* Phase classement */}
-        {phase === 'classement' && (
-          <a
-            href="/concours-ortho/classement"
-            className="block w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-4 text-center transition-all active:scale-95"
-          >
-            🏆 Ouvrir le classement
-          </a>
-        )}
 
         {/* Reset */}
         <button
