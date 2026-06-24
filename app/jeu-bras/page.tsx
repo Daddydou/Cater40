@@ -21,7 +21,17 @@ type UIState =
   | 'finished'
 
 function seedFromRoomId(roomId: string): number {
-  return roomId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+  // FNV-1a hash — produit un ordre nettement différent de l'ordre alphabétique
+  let h = 2166136261
+  for (let i = 0; i < roomId.length; i++) {
+    h = Math.imul(h ^ roomId.charCodeAt(i), 16777619) >>> 0
+  }
+  return h || 1
+}
+
+function extractPrenom(filename: string): string {
+  const name = filename.replace(/\.[^.]+$/, '').replace(/^bras-/i, '')
+  return name.charAt(0).toUpperCase() + name.slice(1)
 }
 
 function lcgRandom(seed: number) {
@@ -240,7 +250,7 @@ export default function JeuBrasCater() {
             className="absolute inset-0 w-full h-full object-contain opacity-20"
           />
         )}
-        <div className="fixed inset-0 flex items-center justify-center bg-black/60">
+        <div className="fixed inset-0 flex flex-col items-center justify-center gap-6 bg-black/60">
           <span
             className="text-9xl select-none"
             style={{
@@ -251,6 +261,11 @@ export default function JeuBrasCater() {
           >
             {isBon ? '❤️' : '💩'}
           </span>
+          {currentPhoto && (
+            <p className="text-white text-2xl font-bold">
+              C&apos;était {extractPrenom(currentPhoto)} !
+            </p>
+          )}
         </div>
         <style>{`
           @keyframes bonPulse {

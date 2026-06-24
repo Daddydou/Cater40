@@ -21,12 +21,17 @@ type UIState =
   | 'finished'
 
 function extractPrenom(filename: string): string {
-  const name = filename.replace(/^bras-/, '').replace(/\.(jpg|jpeg|png)$/i, '')
+  const name = filename.replace(/\.[^.]+$/, '').replace(/^bras-/i, '')
   return name.charAt(0).toUpperCase() + name.slice(1)
 }
 
 function seedFromRoomId(roomId: string): number {
-  return roomId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+  // FNV-1a hash — produit un ordre nettement différent de l'ordre alphabétique
+  let h = 2166136261
+  for (let i = 0; i < roomId.length; i++) {
+    h = Math.imul(h ^ roomId.charCodeAt(i), 16777619) >>> 0
+  }
+  return h || 1
 }
 
 function lcgRandom(seed: number) {
@@ -319,7 +324,12 @@ export default function JeuBrasAnimateur() {
             </div>
           )}
 
-          {/* Feedback badge */}
+          {/* Prenom + feedback pendant les états bon/faux */}
+          {isFeedback && currentPhoto && (
+            <p className="text-[#FFD700] text-3xl font-bold text-center">
+              C&apos;était… {extractPrenom(currentPhoto)} !
+            </p>
+          )}
           {isFeedback && (
             <div
               className={`text-center py-3 rounded-2xl font-bold text-lg ${
