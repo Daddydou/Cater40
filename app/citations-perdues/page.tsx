@@ -219,19 +219,21 @@ export default function CitationsPerduesPage() {
       const norm = normalizeLetter(char);
       const specialColor = COLORED_LETTERS[norm];
       const boutonColor = getBoutonColor(norm);
-
       const isRevealed = validee || achetees.includes(norm) || jeuTermine;
 
       if (!isRevealed) {
         return <span key={i} className="text-gray-300 mx-px select-none">_</span>;
       }
 
+      // Priorité 1 : couleur bouton (C/A/R/O)
       if (boutonColor) {
         return <span key={i} className="mx-px font-black" style={{ color: boutonColor }}>{char.toUpperCase()}</span>;
       }
+      // Priorité 2 : couleur spéciale FNISBL — UNIQUEMENT si achetée ou jeuTermine
       if (specialColor && (achetees.includes(norm) || jeuTermine)) {
         return <span key={i} className="mx-px font-black" style={{ color: specialColor, textShadow: `0 0 8px ${specialColor}88` }}>{char.toUpperCase()}</span>;
       }
+      // Sinon : violet pour toutes les autres lettres révélées
       return <span key={i} className="mx-px font-black" style={{ color: '#7c3aed' }}>{char.toUpperCase()}</span>;
     });
   };
