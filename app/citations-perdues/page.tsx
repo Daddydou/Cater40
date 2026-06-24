@@ -252,10 +252,10 @@ export default function CitationsPerduesPage() {
   const nbValidees = validees.filter(Boolean).length;
 
   return (
-    <div className="min-h-screen bg-white text-gray-900" style={{ fontFamily: 'Georgia, serif' }}>
+    <div className="min-h-screen bg-gray-100 text-gray-900" style={{ fontFamily: 'Georgia, serif' }}>
 
       {/* Header sticky */}
-      <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-white sticky top-0 z-10">
+      <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-100 sticky top-0 z-10">
         <h1 className="text-base font-bold text-yellow-600 tracking-widest uppercase">🎭 Citations Perdues</h1>
         <div className="flex items-center gap-3">
           <span className="text-xs text-gray-500" style={{ fontFamily: 'sans-serif' }}>{nbValidees}/{PHRASES.length}</span>
@@ -271,7 +271,7 @@ export default function CitationsPerduesPage() {
       <div className="px-4 py-6 max-w-2xl mx-auto space-y-8">
 
         {/* Points */}
-        <div className="flex items-center gap-4 bg-gray-50 rounded-2xl px-6 py-4 border border-gray-200">
+        <div className="flex items-center gap-4 bg-gray-200 rounded-2xl px-6 py-4 border border-gray-400">
           <span className="text-gray-500 text-xs uppercase tracking-widest font-bold" style={{ fontFamily: 'sans-serif' }}>Points</span>
           <input
             type="number"
@@ -307,7 +307,7 @@ export default function CitationsPerduesPage() {
                   isBravo    ? 'bg-green-50 border-green-400 scale-[1.01]' :
                   validee    ? 'bg-green-50 border-green-200' :
                   isSelected ? 'bg-yellow-50 border-yellow-400' :
-                               'bg-gray-50 border-gray-400'
+                               'bg-gray-50 border-gray-500'
                 }`}
               >
                 <div
@@ -380,7 +380,7 @@ export default function CitationsPerduesPage() {
         )}
 
         {/* Alphabet — acheter une lettre */}
-        <div className="bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 space-y-3">
+        <div className="bg-gray-50 border border-gray-600 rounded-2xl px-5 py-4 space-y-3">
           <p className="text-xs text-gray-500 uppercase tracking-widest" style={{ fontFamily: 'sans-serif' }}>Acheter une lettre</p>
           <div className="grid grid-cols-9 gap-1">
             {ALPHABET.map(letter => {
@@ -424,7 +424,7 @@ export default function CitationsPerduesPage() {
           ]
 
           return allLetters.length > 0 ? (
-            <div className="bg-gray-50 border border-gray-400 rounded-2xl px-5 py-4 space-y-2">
+            <div className="bg-gray-200 border border-gray-500 rounded-2xl px-5 py-4 space-y-2">
               <p className="text-xs text-gray-500 uppercase tracking-widest" style={{ fontFamily: 'sans-serif' }}>
                 Lettres spéciales découvertes
               </p>
