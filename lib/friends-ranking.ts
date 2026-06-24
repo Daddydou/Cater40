@@ -8,18 +8,10 @@ export type RankedPlayer = {
   isCater: boolean
 }
 
-function normalizePrenom(name: string): string {
-  return name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-}
-
-export function isCaterPrenom(name: string): boolean {
-  const n = normalizePrenom(name)
-  return n.includes('cater') || n.includes('sophie')
-}
-
 export function computeRanking(
   players: { id: string; name: string; avatar_url?: string | null }[],
-  answers: { player_id: string; is_correct: boolean | null; validated: boolean }[]
+  answers: { player_id: string; is_correct: boolean | null; validated: boolean }[],
+  caterPlayerId: string | null
 ): RankedPlayer[] {
   const rawScores: Record<string, number> = {}
   for (const p of players) rawScores[p.id] = 0
@@ -27,9 +19,9 @@ export function computeRanking(
     if (a.is_correct || a.validated) rawScores[a.player_id] = (rawScores[a.player_id] ?? 0) + 1
   }
 
-  const caterPlayer = players.find(p => isCaterPrenom(p.name))
-  const others       = players.filter(p => !isCaterPrenom(p.name))
-  const maxOthers    = others.length > 0
+  const caterPlayer = caterPlayerId ? (players.find(p => p.id === caterPlayerId) ?? null) : null
+  const others      = players.filter(p => p.id !== caterPlayerId)
+  const maxOthers   = others.length > 0
     ? Math.max(...others.map(p => rawScores[p.id] ?? 0))
     : 0
 
@@ -41,7 +33,7 @@ export function computeRanking(
 
   const result: RankedPlayer[] = players.map(p => {
     const raw = rawScores[p.id] ?? 0
-    const ic  = isCaterPrenom(p.name)
+    const ic  = p.id === caterPlayerId
     return {
       id: p.id,
       name: p.name,

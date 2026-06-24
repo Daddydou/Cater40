@@ -18,6 +18,7 @@ type GameState = {
   current_question_id: number | null
   question_open: boolean
   reveal_count: number
+  cater_player_id: string | null
 }
 
 type Player = { id: string; name: string; score: number; avatar_url?: string | null }
@@ -32,13 +33,14 @@ type Answer = {
 }
 
 export default function QuizzFriendsAnimateur() {
-  const [roomId, setRoomId]       = useState<string | null>(null)
-  const [gameState, setGameState] = useState<GameState | null>(null)
-  const [players, setPlayers]     = useState<Player[]>([])
-  const [answers, setAnswers]     = useState<Answer[]>([])
-  const [passedIds, setPassedIds] = useState<number[]>([])
+  const [roomId, setRoomId]           = useState<string | null>(null)
+  const [gameState, setGameState]     = useState<GameState | null>(null)
+  const [players, setPlayers]         = useState<Player[]>([])
+  const [answers, setAnswers]         = useState<Answer[]>([])
+  const [passedIds, setPassedIds]     = useState<number[]>([])
   const [revealCount, setRevealCount] = useState(0)
-  const [loading, setLoading]     = useState(true)
+  const [caterPlayerId, setCaterPlayerId] = useState<string | null>(null)
+  const [loading, setLoading]         = useState(true)
   const initialized = useRef(false)
 
   const fetchAll = useCallback(async (rid: string) => {
@@ -50,6 +52,7 @@ export default function QuizzFriendsAnimateur() {
     if (gsRes.data) {
       setGameState(gsRes.data as GameState)
       setRevealCount(gsRes.data.reveal_count ?? 0)
+      setCaterPlayerId(gsRes.data.cater_player_id ?? null)
       if (gsRes.data.current_question_id && !gsRes.data.question_open) {
         setPassedIds(prev => prev.includes(gsRes.data!.current_question_id!) ? prev : [...prev, gsRes.data!.current_question_id!])
       }
@@ -122,6 +125,18 @@ export default function QuizzFriendsAnimateur() {
     await fetchAll(roomId)
   }
 
+  const handleSetCater = async (playerId: string) => {
+    if (!roomId) return
+    const newCaterId = caterPlayerId === playerId ? null : playerId
+    // Upsert pour créer la ligne si elle n'existe pas encore
+    await supabase.from('friends_game').upsert(
+      { room_id: roomId, cater_player_id: newCaterId, updated_at: new Date().toISOString() },
+      { onConflict: 'room_id' }
+    )
+    setCaterPlayerId(newCaterId)
+    await fetchAll(roomId)
+  }
+
   const handleLaunchClassement = async () => {
     if (!roomId) return
     await supabase.from('friends_game')
@@ -159,6 +174,7 @@ export default function QuizzFriendsAnimateur() {
     setPassedIds([])
     setPlayers([])
     setRevealCount(0)
+    setCaterPlayerId(null)
   }
 
   const currentQuestion = gameState?.current_question_id
@@ -174,14 +190,15 @@ export default function QuizzFriendsAnimateur() {
     q.id !== (gameState?.question_open ? gameState.current_question_id : null)
   )
 
-  const allDone = passedIds.length >= TOTAL_Q && !gameState?.question_open
+  const allDone     = passedIds.length >= TOTAL_Q && !gameState?.question_open
+  const allRevealed = revealCount >= players.length
+
+  const rankedPlayers = gameState?.status === 'finished'
+    ? computeRanking(players, answers, caterPlayerId)
+    : []
 
   const gameUrl       = typeof window !== 'undefined' ? `${window.location.origin}/quizz-friends` : ''
   const classementUrl = typeof window !== 'undefined' ? `${window.location.origin}/quizz-friends/classement` : ''
-
-  // Classement calculé (disponible dès que status=finished)
-  const rankedPlayers = gameState?.status === 'finished' ? computeRanking(players, answers) : []
-  const allRevealed   = revealCount >= players.length
 
   if (loading) return (
     <main className="min-h-screen bg-[#1a0a2e] flex items-center justify-center text-white">
@@ -220,18 +237,41 @@ export default function QuizzFriendsAnimateur() {
           <p>Classement → <span className="text-yellow-300/70 font-mono">{classementUrl}</span></p>
         </div>
 
-        {/* Joueurs inscrits */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
-          <p className="text-white/40 text-xs uppercase tracking-wide">Joueurs ({players.length})</p>
+        {/* Joueurs inscrits + désignation Cater */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-white/40 text-xs uppercase tracking-wide">Joueurs ({players.length})</p>
+            {players.length > 0 && (
+              <p className="text-white/25 text-xs">👑 = bonus beauté si elle ne gagne pas</p>
+            )}
+          </div>
           {players.length === 0
             ? <p className="text-white/25 text-sm text-center py-2">Aucun joueur pour l&apos;instant</p>
-            : players.map((p, i) => (
-              <div key={p.id} className="flex items-center gap-2">
-                <span className="text-white/30 text-xs w-4">{i + 1}.</span>
-                <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={28} />
-                <span className="text-sm">{p.name}</span>
-              </div>
-            ))
+            : players.map((p, i) => {
+              const isDesignated = p.id === caterPlayerId
+              return (
+                <div key={p.id} className={`flex items-center gap-2 rounded-xl px-2 py-1.5 transition-all ${
+                  isDesignated ? 'bg-yellow-500/10 border border-yellow-500/30' : ''
+                }`}>
+                  <span className="text-white/30 text-xs w-4">{i + 1}.</span>
+                  <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={28} />
+                  <span className={`text-sm flex-1 ${isDesignated ? 'text-yellow-300 font-semibold' : ''}`}>
+                    {p.name}
+                  </span>
+                  <button
+                    onClick={() => handleSetCater(p.id)}
+                    className={`text-xs px-2 py-1 rounded-lg transition-all active:scale-95 ${
+                      isDesignated
+                        ? 'bg-yellow-500/30 border border-yellow-500/50 text-yellow-300 font-bold'
+                        : 'bg-white/5 border border-white/10 text-white/30 hover:text-yellow-400 hover:border-yellow-500/30'
+                    }`}
+                    title={isDesignated ? 'Retirer le rôle Cater' : 'Désigner comme Cater'}
+                  >
+                    👑
+                  </button>
+                </div>
+              )
+            })
           }
         </div>
 
@@ -367,14 +407,21 @@ export default function QuizzFriendsAnimateur() {
               </div>
             )}
 
-            {/* Toutes les questions passées */}
+            {/* Toutes les questions passées → lancer le classement */}
             {allDone && (
-              <button
-                onClick={handleLaunchClassement}
-                className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-4 text-lg transition-all active:scale-95"
-              >
-                🏆 Lancer le classement final !
-              </button>
+              <div className="space-y-2">
+                {!caterPlayerId && (
+                  <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-center">
+                    <p className="text-white/40 text-xs">⚠️ Aucune Cater désignée — pas de bonus beauté</p>
+                  </div>
+                )}
+                <button
+                  onClick={handleLaunchClassement}
+                  className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-4 text-lg transition-all active:scale-95"
+                >
+                  🏆 Lancer le classement final !
+                </button>
+              </div>
             )}
 
           </div>
@@ -384,7 +431,6 @@ export default function QuizzFriendsAnimateur() {
         {gameState?.status === 'finished' && (
           <div className="space-y-4">
 
-            {/* Panneau classement + contrôles reveal */}
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-yellow-300 text-xs font-semibold uppercase tracking-wide">
@@ -411,12 +457,8 @@ export default function QuizzFriendsAnimateur() {
                         <span className="text-sm w-6 flex-shrink-0">{medal}</span>
                         <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={24} />
                         <span className="text-sm truncate">{p.name}</span>
-                        {p.isCater && (
-                          <span className="text-yellow-400 text-xs flex-shrink-0">★</span>
-                        )}
-                        {!isRevealed && (
-                          <span className="text-white/25 text-xs flex-shrink-0">masqué</span>
-                        )}
+                        {p.isCater && <span className="text-yellow-400 text-xs flex-shrink-0">★</span>}
+                        {!isRevealed && <span className="text-white/25 text-xs flex-shrink-0">masqué</span>}
                       </div>
                       <div className="text-right flex-shrink-0 ml-2">
                         <span className="text-white text-sm font-bold tabular-nums">{p.finalScore} pts</span>

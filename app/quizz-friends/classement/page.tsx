@@ -34,14 +34,15 @@ export default function QuizzFriendsClassement() {
       const [{ data: playersData }, { data: answersData }, { data: gameData }] = await Promise.all([
         supabase.from('players').select('id, name, avatar_url').eq('room_id', room.id),
         supabase.from('friends_answers').select('player_id, is_correct, validated').eq('room_id', room.id),
-        supabase.from('friends_game').select('reveal_count').eq('room_id', room.id).maybeSingle(),
+        supabase.from('friends_game').select('reveal_count, cater_player_id').eq('room_id', room.id).maybeSingle(),
       ])
 
       if (!playersData) { setLoading(false); return }
 
       const result = computeRanking(
         playersData,
-        (answersData ?? []) as { player_id: string; is_correct: boolean | null; validated: boolean }[]
+        (answersData ?? []) as { player_id: string; is_correct: boolean | null; validated: boolean }[],
+        gameData?.cater_player_id ?? null
       )
       setPlayers(result)
 
