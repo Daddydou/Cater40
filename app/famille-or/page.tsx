@@ -450,8 +450,8 @@ export default function FamilleOrJoueurs() {
           </div>
         )}
 
-        {/* Réponses révélées — seulement en phase normale ou vol */}
-        {reponses.length > 0 && (question?.phase === 'normal' || question?.phase === 'vol') && (
+        {/* Réponses révélées — phase normale, vol, ou fin_manche */}
+        {reponses.length > 0 && (question?.phase === 'normal' || question?.phase === 'vol' || question?.phase === 'fin_manche') && (
           <div className="space-y-2">
             {reponses.map(r => (
               <div key={r.id} className="fo-card-wrap h-14">

@@ -825,20 +825,8 @@ export default function FamilleOrAnimateur() {
               </div>
             )}
 
-            {/* ── Fin de manche ── */}
-            {question.phase === 'fin_manche' && (
-              <div className="bg-green-500/20 border border-green-400 rounded-xl p-4 text-center space-y-3">
-                <p className="text-green-300 font-bold text-lg">✅ Manche terminée !</p>
-                <p className="text-white/50 text-sm">Toutes les réponses sont révélées</p>
-                <button onClick={handleQuestionSuivante}
-                  className="w-full bg-[#ffd700] hover:bg-yellow-300 text-black font-bold rounded-xl py-3 transition-all active:scale-95">
-                  Question suivante →
-                </button>
-              </div>
-            )}
-
             {/* ── Réponses — toutes visibles animateur ── */}
-            {(question.phase === 'normal' || question.phase === 'vol') && (
+            {(question.phase === 'normal' || question.phase === 'vol' || question.phase === 'fin_manche') && (
               <div className="space-y-2">
                 {reponses.map(r => (
                   <div key={r.id} className={`flex items-center justify-between rounded-xl p-3 border ${
@@ -850,7 +838,7 @@ export default function FamilleOrAnimateur() {
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className="text-white/50 text-sm">{r.points}</span>
-                      {!r.revealed ? (
+                      {!r.revealed && question.phase !== 'fin_manche' ? (
                         <button onClick={() => handleReveler(r)}
                           className="bg-[#ffd700] hover:bg-yellow-300 text-black text-xs font-bold px-3 py-1.5 rounded-lg transition-all active:scale-95">
                           Révéler
@@ -872,11 +860,10 @@ export default function FamilleOrAnimateur() {
               </button>
             )}
 
-            {/* Fin de manche (tour normal) */}
+            {/* ── Fin de manche ── */}
             {question.phase === 'fin_manche' && (
               <div className="bg-green-500/20 border border-green-400 rounded-xl p-4 text-center space-y-3">
                 <p className="text-green-300 font-bold text-lg">✅ Manche terminée !</p>
-                <p className="text-white/50 text-sm">Toutes les réponses sont révélées</p>
                 <button onClick={handleQuestionSuivante}
                   className="w-full bg-[#ffd700] hover:bg-yellow-300 text-black font-bold rounded-xl py-3 transition-all active:scale-95">
                   Question suivante →
