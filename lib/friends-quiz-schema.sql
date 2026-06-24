@@ -26,11 +26,19 @@ create table if not exists friends_answers (
   player_id uuid not null,
   player_name text not null,
   question_id int not null,
-  chosen_index int not null,
-  is_correct boolean not null,
+  chosen_index int,          -- null pour les réponses libres
+  is_correct boolean,        -- null pour les réponses libres
+  free_text text,            -- texte saisi pour les questions libres
+  validated boolean not null default false, -- validé manuellement par l'animateur (questions libres)
   created_at timestamptz not null default now(),
   unique (room_id, player_id, question_id)
 );
+
+-- Migration pour les tables déjà existantes :
+alter table friends_answers add column if not exists free_text text;
+alter table friends_answers add column if not exists validated boolean not null default false;
+alter table friends_answers alter column chosen_index drop not null;
+alter table friends_answers alter column is_correct drop not null;
 
 -- 4. RLS (accès public pour le jeu)
 alter table friends_game enable row level security;

@@ -19,7 +19,15 @@ type GameState = {
 }
 
 type Player  = { id: string; name: string; score: number; avatar_url?: string | null }
-type Answer  = { id: string; player_id: string; question_id: number; is_correct: boolean }
+type Answer  = {
+  id: string
+  player_id: string
+  player_name: string
+  question_id: number
+  is_correct: boolean | null
+  free_text: string | null
+  validated: boolean
+}
 
 export default function QuizzFriendsAnimateur() {
   const [roomId, setRoomId]       = useState<string | null>(null)
@@ -34,19 +42,17 @@ export default function QuizzFriendsAnimateur() {
     const [gsRes, plRes, anRes] = await Promise.all([
       supabase.from('friends_game').select('*').eq('room_id', rid).maybeSingle(),
       supabase.from('players').select('id, name, score, avatar_url').eq('room_id', rid).order('name'),
-      supabase.from('friends_answers').select('id, player_id, question_id, is_correct').eq('room_id', rid),
+      supabase.from('friends_answers').select('id, player_id, player_name, question_id, is_correct, free_text, validated').eq('room_id', rid),
     ])
     if (gsRes.data) {
       setGameState(gsRes.data as GameState)
-      // Ajouter la question courante aux passées si elle est fermée
       if (gsRes.data.current_question_id && !gsRes.data.question_open) {
         setPassedIds(prev => prev.includes(gsRes.data!.current_question_id!) ? prev : [...prev, gsRes.data!.current_question_id!])
       }
     }
     if (plRes.data) setPlayers(plRes.data)
     if (anRes.data) {
-      setAnswers(anRes.data)
-      // Initialiser passedIds depuis les réponses existantes
+      setAnswers(anRes.data as Answer[])
       setPassedIds(prev => {
         const merged = [...prev]
         for (const a of anRes.data!) {
@@ -71,7 +77,6 @@ export default function QuizzFriendsAnimateur() {
     init()
   }, [fetchAll])
 
-  // Polling 2s
   useEffect(() => {
     if (!roomId) return
     const id = setInterval(() => fetchAll(roomId), 2000)
@@ -105,6 +110,14 @@ export default function QuizzFriendsAnimateur() {
     await fetchAll(roomId)
   }
 
+  const handleToggleValidation = async (answerId: string, currentValidated: boolean) => {
+    if (!roomId) return
+    await supabase.from('friends_answers')
+      .update({ validated: !currentValidated })
+      .eq('id', answerId)
+    await fetchAll(roomId)
+  }
+
   const handleLaunchClassement = async () => {
     if (!roomId) return
     await supabase.from('friends_game')
@@ -132,6 +145,7 @@ export default function QuizzFriendsAnimateur() {
 
   const answersForCurrentQ = answers.filter(a => a.question_id === gameState?.current_question_id)
   const correctAnswersForCurrentQ = answersForCurrentQ.filter(a => a.is_correct).length
+  const validatedAnswersForCurrentQ = answersForCurrentQ.filter(a => a.validated).length
 
   const pendingQuestions = FRIENDS_QUESTIONS.filter(q =>
     !passedIds.includes(q.id) &&
@@ -196,17 +210,7 @@ export default function QuizzFriendsAnimateur() {
         </div>
 
         {/* Bouton lancer le quiz */}
-        {!gameState && (
-          <button
-            onClick={handleLaunchGame}
-            disabled={players.length === 0}
-            className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-4 text-lg disabled:opacity-30 transition-all active:scale-95"
-          >
-            ▶️ Lancer le quiz ({TOTAL_Q} questions)
-          </button>
-        )}
-
-        {gameState?.status === 'waiting' && (
+        {(!gameState || gameState.status === 'waiting') && (
           <button
             onClick={handleLaunchGame}
             disabled={players.length === 0}
@@ -220,12 +224,12 @@ export default function QuizzFriendsAnimateur() {
         {gameState?.status === 'playing' && (
           <div className="space-y-4">
 
-            {/* Question en cours */}
-            {gameState.question_open && currentQuestion && (
+            {/* Question QCM en cours */}
+            {gameState.question_open && currentQuestion?.type === 'qcm' && (
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-yellow-300 text-xs font-semibold uppercase tracking-wide">
-                    ▶️ Question {currentQuestion.id} / {TOTAL_Q}
+                    ▶️ Q{currentQuestion.id} / {TOTAL_Q} — QCM
                   </span>
                   <span className="text-white/50 text-sm">
                     {answersForCurrentQ.length}/{players.length} réponses
@@ -233,15 +237,66 @@ export default function QuizzFriendsAnimateur() {
                 </div>
                 <p className="text-sm font-medium">{currentQuestion.question}</p>
 
-                {/* Bonne réponse visible animateur */}
                 <div className="bg-green-900/40 border border-green-500/40 rounded-xl px-4 py-2">
                   <p className="text-green-300 text-xs font-bold uppercase tracking-widest mb-1">✅ Bonne réponse</p>
                   <p className="text-white font-semibold">{currentQuestion.options[currentQuestion.correctIndex]}</p>
                 </div>
 
-                {/* Compteur correct */}
                 <p className="text-white/50 text-xs text-center">
                   {correctAnswersForCurrentQ} joueur{correctAnswersForCurrentQ > 1 ? 's ont' : ' a'} la bonne réponse
+                </p>
+
+                <button
+                  onClick={handleCloseQuestion}
+                  className="w-full bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl py-2.5 text-sm font-semibold transition-all active:scale-95"
+                >
+                  ⏹ Fermer la question
+                </button>
+              </div>
+            )}
+
+            {/* Question LIBRE en cours */}
+            {gameState.question_open && currentQuestion?.type === 'libre' && (
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-2xl p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-purple-300 text-xs font-semibold uppercase tracking-wide">
+                    ▶️ Q{currentQuestion.id} / {TOTAL_Q} — Réponse libre
+                  </span>
+                  <span className="text-white/50 text-sm">
+                    {answersForCurrentQ.length}/{players.length} réponses
+                  </span>
+                </div>
+                <p className="text-sm font-medium">{currentQuestion.question}</p>
+
+                {/* Liste des réponses à valider */}
+                <div className="space-y-2">
+                  {answersForCurrentQ.length === 0 ? (
+                    <p className="text-white/30 text-sm text-center py-3">Aucune réponse encore…</p>
+                  ) : (
+                    answersForCurrentQ.map(a => (
+                      <div key={a.id} className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-white/40 text-xs block">{a.player_name}</span>
+                          <span className="text-sm text-white/90">{a.free_text || <em className="text-white/30">vide</em>}</span>
+                        </div>
+                        <button
+                          onClick={() => handleToggleValidation(a.id, a.validated)}
+                          className={`flex-shrink-0 text-xl px-2 py-1 rounded-lg transition-all active:scale-95 ${
+                            a.validated
+                              ? 'bg-green-500/30 border border-green-500/40 text-green-300'
+                              : 'bg-white/10 border border-white/20 text-white/40'
+                          }`}
+                          title={a.validated ? 'Invalider' : 'Valider'}
+                        >
+                          {a.validated ? '✅' : '❌'}
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <p className="text-white/40 text-xs text-center">
+                  {validatedAnswersForCurrentQ} réponse{validatedAnswersForCurrentQ > 1 ? 's validées' : ' validée'}
                 </p>
 
                 <button
@@ -261,9 +316,18 @@ export default function QuizzFriendsAnimateur() {
                 </p>
                 {pendingQuestions.map(q => (
                   <div key={q.id} className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <span className="text-white/30 text-xs mr-2">Q{q.id}</span>
-                      <span className="text-sm text-white/80">{q.question}</span>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-white/30 text-xs">Q{q.id}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          q.type === 'libre'
+                            ? 'bg-purple-500/20 text-purple-300'
+                            : 'bg-white/10 text-white/40'
+                        }`}>
+                          {q.type === 'libre' ? '✍️ Libre' : 'QCM'}
+                        </span>
+                      </div>
+                      <span className="text-sm text-white/80 block">{q.question}</span>
                     </div>
                     {!gameState.question_open && (
                       <button

@@ -54,7 +54,7 @@ export default function QuizzFriendsClassement() {
 
       const [{ data: playersData }, { data: answersData }, { data: gameData }] = await Promise.all([
         supabase.from('players').select('id, name, avatar_url').eq('room_id', room.id),
-        supabase.from('friends_answers').select('player_id, is_correct').eq('room_id', room.id),
+        supabase.from('friends_answers').select('player_id, is_correct, validated').eq('room_id', room.id),
         supabase.from('friends_game').select('reveal_count').eq('room_id', room.id).maybeSingle(),
       ])
 
@@ -64,7 +64,7 @@ export default function QuizzFriendsClassement() {
       const rawScores: Record<string, number> = {}
       for (const p of playersData) rawScores[p.id] = 0
       for (const a of (answersData ?? [])) {
-        if (a.is_correct) rawScores[a.player_id] = (rawScores[a.player_id] ?? 0) + 1
+        if (a.is_correct || a.validated) rawScores[a.player_id] = (rawScores[a.player_id] ?? 0) + 1
       }
 
       // Bonus Cater
