@@ -121,6 +121,9 @@ export default function DicteeAnimateur() {
       await supabase.from('players').update({ score: isNaN(val) ? 0 : val }).eq('id', player.id)
     }
     await updateStatus('finished')
+    if (roomRef.current) {
+      await supabase.from('rooms').update({ reveal_count: 0 }).eq('id', roomRef.current.id)
+    }
     setSaving(false)
     router.push('/dictee/classement?a=1')
   }

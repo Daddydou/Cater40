@@ -16,37 +16,30 @@ function ClassementContent() {
   const isAnimateur  = searchParams.get('a') === '1'
 
   const [players, setPlayers]           = useState<Player[]>([])
-  const [sessionId, setSessionId]       = useState<string | null>(null)
+  const [roomId, setRoomId]             = useState<string | null>(null)
   const [revealCount, setRevealCount]   = useState(0)
   const [showConfetti, setShowConfetti] = useState(false)
   const [showMessage, setShowMessage]   = useState(false)
   const [loading, setLoading]           = useState(true)
-  const sessionIdRef      = useRef<string | null>(null)
   const confettiTriggered = useRef(false)
 
-  // Chargement initial
+  // Chargement initial — lit reveal_count depuis rooms
   useEffect(() => {
     const load = async () => {
       const { data: room } = await supabase
-        .from('rooms').select('id').eq('code', ROOM_CODE).single()
+        .from('rooms').select('id, reveal_count').eq('code', ROOM_CODE).single()
       if (!room) { setLoading(false); return }
 
-      const [{ data: playersData }, { data: session }] = await Promise.all([
-        supabase
-          .from('players').select('id, name, score, avatar_url')
-          .eq('room_id', room.id).order('score', { ascending: true }),
-        supabase
-          .from('dictee_sessions').select('id, reveal_count')
-          .eq('room_id', room.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-      ])
+      setRoomId(room.id)
+      const rc = room.reveal_count ?? 0
+      setRevealCount(rc)
 
-      if (playersData) setPlayers(playersData)
-      if (session) {
-        sessionIdRef.current = session.id
-        setSessionId(session.id)
-        const rc = session.reveal_count ?? 0
-        setRevealCount(rc)
-        if (playersData && rc >= playersData.length && playersData.length > 0) {
+      const { data: playersData } = await supabase
+        .from('players').select('id, name, score, avatar_url')
+        .eq('room_id', room.id).order('score', { ascending: true })
+      if (playersData) {
+        setPlayers(playersData)
+        if (rc >= playersData.length && playersData.length > 0) {
           confettiTriggered.current = true
           setShowConfetti(true)
           setShowMessage(true)
@@ -57,16 +50,16 @@ function ClassementContent() {
     load()
   }, [])
 
-  // Polling reveal_count toutes les 2s (animateur + spectateurs)
+  // Polling reveal_count toutes les 2s depuis rooms
   useEffect(() => {
-    if (!sessionId) return
+    if (!roomId) return
     const id = setInterval(async () => {
       const { data } = await supabase
-        .from('dictee_sessions').select('reveal_count').eq('id', sessionId).single()
+        .from('rooms').select('reveal_count').eq('id', roomId).single()
       if (data?.reveal_count !== undefined) setRevealCount(data.reveal_count)
     }, 2000)
     return () => clearInterval(id)
-  }, [sessionId])
+  }, [roomId])
 
   // Déclencher confettis quand tout est révélé
   useEffect(() => {
@@ -80,8 +73,8 @@ function ClassementContent() {
   const handleNext = async () => {
     const next = Math.min(revealCount + 1, players.length)
     setRevealCount(next)
-    if (sessionIdRef.current) {
-      await supabase.from('dictee_sessions').update({ reveal_count: next }).eq('id', sessionIdRef.current)
+    if (roomId) {
+      await supabase.from('rooms').update({ reveal_count: next }).eq('id', roomId)
     }
     if (next >= players.length) {
       setTimeout(() => { setShowConfetti(true); setShowMessage(true) }, 600)
@@ -90,8 +83,8 @@ function ClassementContent() {
 
   const handleRevealAll = async () => {
     setRevealCount(players.length)
-    if (sessionIdRef.current) {
-      await supabase.from('dictee_sessions').update({ reveal_count: players.length }).eq('id', sessionIdRef.current)
+    if (roomId) {
+      await supabase.from('rooms').update({ reveal_count: players.length }).eq('id', roomId)
     }
     setTimeout(() => { setShowConfetti(true); setShowMessage(true) }, 600)
   }
