@@ -61,22 +61,22 @@ function ClassementContent() {
     load()
   }, [])
 
-  // Spectateur : polling toutes les 2s sur dictee_sessions.reveal_count + players
+  // Spectateur : lit reveal_count depuis Supabase immédiatement puis toutes les 2s
   useEffect(() => {
     if (isAnimateur || !roomId) return
-    const interval = setInterval(async () => {
+
+    const poll = async () => {
       const { data: session } = await supabase
         .from('dictee_sessions')
-        .select('id, reveal_count')
+        .select('reveal_count')
         .eq('room_id', roomId)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
-      if (!session) return
-      sessionIdRef.current = session.id
-      const count = session.reveal_count ?? 0
-      setRevealedCount(count)
+      if (session?.reveal_count !== undefined) {
+        setRevealedCount(session.reveal_count)
+      }
 
       const { data: playersData } = await supabase
         .from('players')
@@ -84,7 +84,10 @@ function ClassementContent() {
         .eq('room_id', roomId)
         .order('score', { ascending: true })
       if (playersData) setPlayers(playersData)
-    }, 2000)
+    }
+
+    poll()
+    const interval = setInterval(poll, 2000)
     return () => clearInterval(interval)
   }, [isAnimateur, roomId])
 
