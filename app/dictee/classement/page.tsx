@@ -15,90 +15,71 @@ function ClassementContent() {
   const searchParams = useSearchParams()
   const isAnimateur  = searchParams.get('a') === '1'
 
-  const [players, setPlayers]             = useState<Player[]>([])
-  const [revealedCount, setRevealedCount] = useState(0)
-  const [showConfetti, setShowConfetti]   = useState(false)
-  const [showMessage, setShowMessage]     = useState(false)
-  const [loading, setLoading]             = useState(true)
+  const [players, setPlayers]           = useState<Player[]>([])
+  const [sessionId, setSessionId]       = useState<string | null>(null)
+  const [revealCount, setRevealCount]   = useState(0)
+  const [showConfetti, setShowConfetti] = useState(false)
+  const [showMessage, setShowMessage]   = useState(false)
+  const [loading, setLoading]           = useState(true)
   const sessionIdRef      = useRef<string | null>(null)
   const confettiTriggered = useRef(false)
 
+  // Chargement initial
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null
-
     const load = async () => {
       const { data: room } = await supabase
-        .from('rooms')
-        .select('id')
-        .eq('code', ROOM_CODE)
-        .maybeSingle()
+        .from('rooms').select('id').eq('code', ROOM_CODE).single()
       if (!room) { setLoading(false); return }
-
-      const roomId = room.id
 
       const [{ data: playersData }, { data: session }] = await Promise.all([
         supabase
-          .from('players')
-          .select('id, name, score, avatar_url')
-          .eq('room_id', roomId)
-          .order('score', { ascending: true }),
+          .from('players').select('id, name, score, avatar_url')
+          .eq('room_id', room.id).order('score', { ascending: true }),
         supabase
-          .from('dictee_sessions')
-          .select('id, reveal_count')
-          .eq('room_id', roomId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+          .from('dictee_sessions').select('id, reveal_count')
+          .eq('room_id', room.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       ])
 
       if (playersData) setPlayers(playersData)
       if (session) {
         sessionIdRef.current = session.id
-        setRevealedCount(session.reveal_count ?? 0)
+        setSessionId(session.id)
+        const rc = session.reveal_count ?? 0
+        setRevealCount(rc)
+        if (playersData && rc >= playersData.length && playersData.length > 0) {
+          confettiTriggered.current = true
+          setShowConfetti(true)
+          setShowMessage(true)
+        }
       }
       setLoading(false)
-
-      // Spectateur : polling démarré après le chargement, room.id en closure
-      if (!isAnimateur) {
-        const poll = async () => {
-          const { data: s } = await supabase
-            .from('dictee_sessions')
-            .select('reveal_count')
-            .eq('room_id', roomId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-          if (s?.reveal_count !== undefined) setRevealedCount(s.reveal_count)
-
-          const { data: pd } = await supabase
-            .from('players')
-            .select('id, name, score, avatar_url')
-            .eq('room_id', roomId)
-            .order('score', { ascending: true })
-          if (pd) setPlayers(pd)
-        }
-
-        poll()
-        interval = setInterval(poll, 2000)
-      }
     }
-
     load()
-    return () => { if (interval) clearInterval(interval) }
-  }, [isAnimateur])
+  }, [])
 
-  // Confettis pour les spectateurs dès que tout est révélé
+  // Polling reveal_count toutes les 2s (animateur + spectateurs)
   useEffect(() => {
-    if (confettiTriggered.current || players.length === 0) return
-    if (revealedCount >= players.length) {
+    if (!sessionId) return
+    const id = setInterval(async () => {
+      const { data } = await supabase
+        .from('dictee_sessions').select('reveal_count').eq('id', sessionId).single()
+      if (data?.reveal_count !== undefined) setRevealCount(data.reveal_count)
+    }, 2000)
+    return () => clearInterval(id)
+  }, [sessionId])
+
+  // Déclencher confettis quand tout est révélé
+  useEffect(() => {
+    if (players.length === 0 || confettiTriggered.current) return
+    if (revealCount >= players.length) {
       confettiTriggered.current = true
       setTimeout(() => { setShowConfetti(true); setShowMessage(true) }, 600)
     }
-  }, [revealedCount, players.length])
+  }, [revealCount, players])
 
   const handleNext = async () => {
-    const next = revealedCount + 1
-    setRevealedCount(next)
+    const next = Math.min(revealCount + 1, players.length)
+    setRevealCount(next)
     if (sessionIdRef.current) {
       await supabase.from('dictee_sessions').update({ reveal_count: next }).eq('id', sessionIdRef.current)
     }
@@ -108,7 +89,7 @@ function ClassementContent() {
   }
 
   const handleRevealAll = async () => {
-    setRevealedCount(players.length)
+    setRevealCount(players.length)
     if (sessionIdRef.current) {
       await supabase.from('dictee_sessions').update({ reveal_count: players.length }).eq('id', sessionIdRef.current)
     }
@@ -136,6 +117,7 @@ function ClassementContent() {
 
   // displayOrder : meilleur en haut (index 0), révélation du bas vers le haut
   const displayOrder = [...players].reverse()
+  const isShown = (i: number) => revealCount >= displayOrder.length - i
 
   return (
     <main className="min-h-screen bg-[#1a1a0f] text-white p-5 overflow-hidden relative">
@@ -168,36 +150,36 @@ function ClassementContent() {
 
         <div className="space-y-3">
           {displayOrder.map((p, i) => {
-            const rank    = i + 1
-            const isShown = i >= displayOrder.length - revealedCount
-            const medal   = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`
+            const rank  = i + 1
+            const shown = isShown(i)
+            const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`
+
+            if (!shown) {
+              return (
+                <div key={p.id} className="h-16 bg-white/3 border border-white/5 rounded-2xl flex items-center justify-center">
+                  <span className="text-white/20 text-sm">???</span>
+                </div>
+              )
+            }
 
             return (
-              <div key={p.id} className="transition-all duration-500">
-                {isShown ? (
-                  <div className={`flex items-center justify-between rounded-2xl p-4 border pop-in ${
-                    rank === 1 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-white/5 border-white/10'
-                  }`}>
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl w-8">{medal}</span>
-                      <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={36} />
-                      <span className="font-semibold text-lg">{p.name}</span>
-                    </div>
-                    <span className="text-2xl font-bold tabular-nums">
-                      {p.score}<span className="text-white/30 text-base">/20</span>
-                    </span>
-                  </div>
-                ) : (
-                  <div className="h-16 bg-white/3 border border-white/5 rounded-2xl flex items-center justify-center">
-                    <span className="text-white/20 text-sm">???</span>
-                  </div>
-                )}
+              <div key={p.id} className={`flex items-center justify-between rounded-2xl p-4 border pop-in ${
+                rank === 1 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-white/5 border-white/10'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl w-8">{medal}</span>
+                  <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={36} />
+                  <span className="font-semibold text-lg">{p.name}</span>
+                </div>
+                <span className="text-2xl font-bold tabular-nums">
+                  {p.score}<span className="text-white/30 text-base">/20</span>
+                </span>
               </div>
             )
           })}
         </div>
 
-        {isAnimateur && revealedCount < players.length && (
+        {isAnimateur && revealCount < players.length && (
           <div className="space-y-2">
             <button
               onClick={handleNext}
