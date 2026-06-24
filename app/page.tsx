@@ -6,12 +6,12 @@ import Image from 'next/image'
 import { Confetti } from '@/components/Confetti'
 
 const JEUX_META: Record<string, { nom: string; emoji: string }> = {
-  'quizz-friends':     { nom: 'Quizz Friends',    emoji: '📺' },
-  'jeu-bras':          { nom: 'Jeu des bras',      emoji: '💪' },
-  'dictee':            { nom: 'Dictée',            emoji: '✏️' },
-  'citations-perdues': { nom: 'Citations Perdues', emoji: '🎭' },
-  'concours-ortho':    { nom: 'Concours Ortho',    emoji: '📝' },
-  'famille-or':        { nom: 'Famille en Or',     emoji: '🏆' },
+  'quizz-friends':     { nom: 'We are your Friends',           emoji: '📺' },
+  'jeu-bras':          { nom: 'Gros Bras',                     emoji: '💪' },
+  'dictee':            { nom: 'La dictée de Bernard Pivote !', emoji: '✏️' },
+  'citations-perdues': { nom: 'Kikadikoi',                     emoji: '🎭' },
+  'concours-ortho':    { nom: 'Concours Ortho',                emoji: '📝' },
+  'famille-or':        { nom: 'Une famille en or',             emoji: '🏆' },
 }
 
 interface JeuVisible {

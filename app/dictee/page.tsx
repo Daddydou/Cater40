@@ -114,7 +114,7 @@ export default function Dictee() {
       <main className="min-h-screen bg-[#1a1a0f] flex flex-col items-center justify-center p-6 text-white">
         <div className="w-full max-w-sm space-y-6 text-center">
           <div className="text-6xl">📝</div>
-          <h1 className="text-2xl font-bold">La Dictée</h1>
+          <h1 className="text-2xl font-bold">La dictée de Bernard Pivote !</h1>
           <input
             value={prenom}
             onChange={e => setPrenom(e.target.value)}

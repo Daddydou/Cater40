@@ -10,10 +10,10 @@ const JEUX_MULTI = [
   { nom: 'Hub Cater 🎂',     url: 'https://cater40.vercel.app' },
   { nom: 'Hub Joueurs 🎉',   url: 'https://cater40.vercel.app/joueurs' },
   { nom: 'Concours Ortho',  url: 'https://cater40.vercel.app/concours-ortho' },
-  { nom: 'Dictée',          url: 'https://cater40.vercel.app/dictee' },
-  { nom: 'Famille en or',   url: 'https://cater40.vercel.app/famille-or' },
-  { nom: 'Une Cater en or', url: 'https://cater40.vercel.app/cater-en-or/joueurs' },
-  { nom: 'Quizz Friends',   url: 'https://cater40.vercel.app/quizz-friends' },
+  { nom: 'La dictée de Bernard Pivote !', url: 'https://cater40.vercel.app/dictee' },
+  { nom: 'Une famille en or',            url: 'https://cater40.vercel.app/famille-or' },
+  { nom: 'Une Cater en or',              url: 'https://cater40.vercel.app/cater-en-or/joueurs' },
+  { nom: 'We are your Friends',          url: 'https://cater40.vercel.app/quizz-friends' },
 ]
 
 import { useEffect, useState } from 'react'

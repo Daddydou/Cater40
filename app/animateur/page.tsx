@@ -5,21 +5,21 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
 const JEUX = [
-  { num: 1, nom: 'Gros Bras',        emoji: '💪', code: 'jeu-bras',       href: '/jeu-bras/animateur' },
-  { num: 2, nom: 'Concours Ortho',   emoji: '✍️', code: 'concours-ortho', href: '/concours-ortho/animateur' },
-  { num: 3, nom: 'Dictée',           emoji: '📝', code: 'dictee',          href: '/dictee/animateur' },
-  { num: 4, nom: 'Famille en or',    emoji: '🏆', code: 'famille-or',      href: '/famille-or/animateur' },
-  { num: 8, nom: 'Citations Perdues',emoji: '💬', code: null,              href: '/citations-perdues' },
-  { num: 9, nom: 'Quizz Friends',    emoji: '🛋️', code: 'quizz-friends',   href: '/quizz-friends/animateur' },
+  { num: 1, nom: 'Gros Bras',                     emoji: '💪', code: 'jeu-bras',       href: '/jeu-bras/animateur' },
+  { num: 2, nom: 'Concours Ortho',               emoji: '✍️', code: 'concours-ortho', href: '/concours-ortho/animateur' },
+  { num: 3, nom: 'La dictée de Bernard Pivote !',emoji: '📝', code: 'dictee',          href: '/dictee/animateur' },
+  { num: 4, nom: 'Une famille en or',            emoji: '🏆', code: 'famille-or',      href: '/famille-or/animateur' },
+  { num: 8, nom: 'Kikadikoi',                    emoji: '💬', code: null,              href: '/citations-perdues' },
+  { num: 9, nom: 'We are your Friends',          emoji: '🛋️', code: 'quizz-friends',   href: '/quizz-friends/animateur' },
 ] as const
 
 const JEUX_META: Record<string, { nom: string; emoji: string }> = {
-  'quizz-friends':     { nom: 'Quizz Friends',    emoji: '📺' },
-  'jeu-bras':          { nom: 'Jeu des bras',      emoji: '💪' },
-  'dictee':            { nom: 'Dictée',            emoji: '✏️' },
-  'citations-perdues': { nom: 'Citations Perdues', emoji: '🎭' },
-  'concours-ortho':    { nom: 'Concours Ortho',    emoji: '📝' },
-  'famille-or':        { nom: 'Famille en Or',     emoji: '🏆' },
+  'quizz-friends':     { nom: 'We are your Friends',           emoji: '📺' },
+  'jeu-bras':          { nom: 'Gros Bras',                     emoji: '💪' },
+  'dictee':            { nom: 'La dictée de Bernard Pivote !', emoji: '✏️' },
+  'citations-perdues': { nom: 'Kikadikoi',                     emoji: '🎭' },
+  'concours-ortho':    { nom: 'Concours Ortho',                emoji: '📝' },
+  'famille-or':        { nom: 'Une famille en or',             emoji: '🏆' },
 }
 
 interface JeuData {
@@ -185,7 +185,7 @@ export default function HubAnimateur() {
   }
 
   const handleResetCitations = async () => {
-    if (!confirm('Réinitialiser Citations Perdues ? La partie en cours sera supprimée.')) return
+    if (!confirm('Réinitialiser Kikadikoi ? La partie en cours sera supprimée.')) return
     setResetting('citations-perdues')
     await supabase.from('citations_game').update({
       points: 0,
@@ -325,7 +325,7 @@ export default function HubAnimateur() {
                   <button
                     onClick={handleResetCitations}
                     disabled={resetting === 'citations-perdues'}
-                    title="Réinitialiser Citations Perdues"
+                    title="Réinitialiser Kikadikoi"
                     className="px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-sm transition-all active:scale-95 disabled:opacity-40"
                   >
                     {resetting === 'citations-perdues' ? '…' : '↺'}

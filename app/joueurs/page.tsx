@@ -6,10 +6,10 @@ import { supabase } from '@/lib/supabase'
 import PauseOverlay from '@/components/PauseOverlay'
 
 const JEUX_META: Record<string, { nom: string; emoji: string }> = {
-  'quizz-friends':  { nom: 'Quizz Friends',  emoji: '📺' },
-  'dictee':         { nom: 'Dictée',          emoji: '✏️' },
-  'concours-ortho': { nom: 'Concours Ortho',  emoji: '📝' },
-  'famille-or':     { nom: 'Famille en Or',   emoji: '🏆' },
+  'quizz-friends':  { nom: 'We are your Friends',           emoji: '📺' },
+  'dictee':         { nom: 'La dictée de Bernard Pivote !', emoji: '✏️' },
+  'concours-ortho': { nom: 'Concours Ortho',                emoji: '📝' },
+  'famille-or':     { nom: 'Une famille en or',             emoji: '🏆' },
 }
 
 interface JeuVisible {

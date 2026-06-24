@@ -134,7 +134,7 @@ function ClassementContent() {
 
         <div className="text-center pt-4 pb-2">
           <h1 className="text-2xl font-bold">🏆 Classement final</h1>
-          <p className="text-white/40 text-sm mt-1">La Dictée — scores sur 20</p>
+          <p className="text-white/40 text-sm mt-1">La dictée de Bernard Pivote ! — scores sur 20</p>
         </div>
 
         {isAnimateur && (

@@ -130,7 +130,7 @@ export default function QuizzFriendsClassement() {
         <div className="text-center pt-4 pb-2">
           <div className="text-4xl mb-2">🛋️</div>
           <h1 className="text-2xl font-bold text-yellow-400">Classement final</h1>
-          <p className="text-white/40 text-sm mt-1">Quizz Friends</p>
+          <p className="text-white/40 text-sm mt-1">We are your Friends</p>
         </div>
 
         {/* Classement */}

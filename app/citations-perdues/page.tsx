@@ -264,7 +264,7 @@ export default function CitationsPerduesPage() {
 
       {/* Header sticky */}
       <div className="border-b border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-100 sticky top-0 z-10">
-        <h1 className="text-base font-bold text-yellow-600 tracking-widest uppercase">🎭 Citations Perdues</h1>
+        <h1 className="text-base font-bold text-yellow-600 tracking-widest uppercase">🎭 Kikadikoi</h1>
         <div className="flex items-center gap-3">
           <span className="text-xs text-gray-500" style={{ fontFamily: 'sans-serif' }}>{nbValidees}/{PHRASES.length}</span>
           <button

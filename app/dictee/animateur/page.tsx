@@ -158,7 +158,7 @@ export default function DicteeAnimateur() {
           <Link href="/animateur" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-yellow-400 transition-colors font-bold tracking-wide">← Hub</Link>
           <div className="text-center">
             <div className="text-5xl mb-2">📝</div>
-            <h1 className="text-2xl font-bold">La Dictée — Animateur</h1>
+            <h1 className="text-2xl font-bold">La dictée de Bernard Pivote ! — Animateur</h1>
             <p className="text-white/40 text-sm mt-1">
               {players.length} joueur{players.length !== 1 ? 's' : ''} inscrit{players.length !== 1 ? 's' : ''}
             </p>

@@ -232,7 +232,7 @@ export default function QuizzFriends() {
         <main className="min-h-screen bg-[#1a0a2e] flex flex-col items-center justify-center p-6 text-white">
           <div className="w-full max-w-sm space-y-6 text-center">
             <div className="text-6xl">🛋️</div>
-            <h1 className="text-3xl font-bold text-yellow-400">Quizz Friends</h1>
+            <h1 className="text-3xl font-bold text-yellow-400">We are your Friends</h1>
             <p className="text-white/50 text-sm">Tu sais tout sur la série ? Prouve-le !</p>
             <input
               value={prenom}

@@ -215,7 +215,7 @@ export default function QuizzFriendsAnimateur() {
           <div className="flex items-center gap-3">
             <Link href="/animateur" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-yellow-400 transition-colors font-bold tracking-wide">← Hub</Link>
             <div>
-              <h1 className="text-xl font-bold text-yellow-400">🛋️ Quizz Friends</h1>
+              <h1 className="text-xl font-bold text-yellow-400">🛋️ We are your Friends</h1>
               <p className="text-white/40 text-sm">Interface animateur</p>
             </div>
           </div>
