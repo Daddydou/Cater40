@@ -159,15 +159,10 @@ export default function CitationsPerduesPage() {
       showError("Ce n'est pas ça… réessaie !");
       return;
     }
-    const phraseLetters = PHRASES[phraseIdx].split('').map(c => normalizeLetter(c)).filter(c => isAlpha(c));
-    let newColorees = [...(session.lettres_colorees_revelees || [])];
-    phraseLetters.forEach(l => {
-      if (COLORED_LETTERS[l] && !newColorees.includes(l)) newColorees = [...newColorees, l];
-    });
     const newValidees = [...(session.phrases_validees || Array(PHRASES.length).fill(false))];
     newValidees[phraseIdx] = true;
     const toutesValidees = newValidees.every(Boolean);
-    const updated = { phrases_validees: newValidees, lettres_colorees_revelees: newColorees };
+    const updated = { phrases_validees: newValidees };
     setSession(prev => prev ? { ...prev, ...updated } : prev);
     setBravoPhrase(phraseIdx);
     setPhraseInput('');
@@ -202,39 +197,42 @@ export default function CitationsPerduesPage() {
     await supabase.from('citations_game').update(fresh).eq('id', session.id);
   };
 
+  const getBoutonColor = (letter: string): string | null => {
+    const BOUTON_MAP: Record<string, { n: number, color: string }> = {
+      C: { n: 1, color: '#9ca3af' },
+      A: { n: 2, color: '#92400e' },
+      R: { n: 3, color: '#1e40af' },
+      O: { n: 4, color: '#000000' },
+    };
+    const entry = BOUTON_MAP[letter];
+    if (!entry) return null;
+    return boutonsActifs[entry.n] ? entry.color : null;
+  };
+
   const renderPhrase = (phrase: string, phraseIdx: number) => {
-    const achetees = jeuTermine
-      ? ALPHABET.filter(l => COLORED_LETTERS[l])
-      : (session?.lettres_achetees || []);
+    const achetees = session?.lettres_achetees || [];
     const validee = session?.phrases_validees?.[phraseIdx] ?? false;
 
     return phrase.split('').map((char, i) => {
       if (char === ' ') return <span key={i} className="inline-block w-3" />;
       if (!isAlpha(char)) return <span key={i} className="text-gray-400 mx-px">{char}</span>;
       const norm = normalizeLetter(char);
+      const specialColor = COLORED_LETTERS[norm];
+      const boutonColor = getBoutonColor(norm);
 
-      if (validee || achetees.includes(norm)) {
-        // Bouton bonus — prioritaire (C, A, R, O)
-        let boutonColor: string | null = null;
-        for (const [numStr, letter] of Object.entries(BOUTON_LETTERS)) {
-          if (letter === norm && boutonsActifs[Number(numStr)]) {
-            boutonColor = BOUTON_COLORS[letter];
-            break;
-          }
-        }
-        if (boutonColor) {
-          return <span key={i} className="mx-px font-black" style={{ color: boutonColor }}>{char.toUpperCase()}</span>;
-        }
-        // Lettres FNISBL colorées
-        const coloredColor = COLORED_LETTERS[norm];
-        if (coloredColor) {
-          return <span key={i} className="mx-px font-black" style={{ color: coloredColor, textShadow: `0 0 8px ${coloredColor}88` }}>{char.toUpperCase()}</span>;
-        }
-        // Autres lettres révélées → violet
-        return <span key={i} className="mx-px font-bold" style={{ color: '#7c3aed' }}>{char.toUpperCase()}</span>;
+      const isRevealed = validee || achetees.includes(norm) || jeuTermine;
+
+      if (!isRevealed) {
+        return <span key={i} className="text-gray-300 mx-px select-none">_</span>;
       }
 
-      return <span key={i} className="text-gray-300 mx-px select-none">_</span>;
+      if (boutonColor) {
+        return <span key={i} className="mx-px font-black" style={{ color: boutonColor }}>{char.toUpperCase()}</span>;
+      }
+      if (specialColor && (achetees.includes(norm) || jeuTermine)) {
+        return <span key={i} className="mx-px font-black" style={{ color: specialColor, textShadow: `0 0 8px ${specialColor}88` }}>{char.toUpperCase()}</span>;
+      }
+      return <span key={i} className="mx-px font-black" style={{ color: '#7c3aed' }}>{char.toUpperCase()}</span>;
     });
   };
 
@@ -408,20 +406,18 @@ export default function CitationsPerduesPage() {
 
         {/* Lettres spéciales découvertes */}
         {(() => {
-          const BOUTON_LETTERS_INFO: Record<number, { letter: string, color: string }> = {
+          const BOUTON_LETTERS: Record<number, { letter: string, color: string }> = {
             1: { letter: 'C', color: '#9ca3af' },
             2: { letter: 'A', color: '#92400e' },
             3: { letter: 'R', color: '#1e40af' },
             4: { letter: 'O', color: '#000000' },
           }
-          const boutonsLetters = Object.entries(boutonsActifs)
-            .filter(([, actif]) => actif)
-            .map(([n]) => BOUTON_LETTERS_INFO[Number(n)])
+          const boutonsEntries = ([1, 2, 3, 4] as number[])
+            .filter(n => boutonsActifs[n])
+            .map(n => BOUTON_LETTERS[n])
 
-          const allLetters = [
-            ...(session.lettres_colorees_revelees || []).map(l => ({ letter: l, color: COLORED_LETTERS[l] })),
-            ...boutonsLetters,
-          ]
+          const coloredLetters = (session.lettres_colorees_revelees || []).map(l => ({ letter: l, color: COLORED_LETTERS[l] }))
+          const allLetters = [...coloredLetters, ...boutonsEntries]
 
           return allLetters.length > 0 ? (
             <div className="bg-gray-200 border border-gray-500 rounded-2xl px-5 py-4 space-y-2">
@@ -430,14 +426,7 @@ export default function CitationsPerduesPage() {
               </p>
               <div className="flex gap-3 flex-wrap">
                 {allLetters.map((l, i) => (
-                  <span
-                    key={i}
-                    className="text-3xl font-black"
-                    style={{
-                      color: l.color,
-                      textShadow: `0 0 8px ${l.color}66`,
-                    }}
-                  >
+                  <span key={i} className="text-3xl font-black" style={{ color: l.color, textShadow: `0 0 8px ${l.color}66` }}>
                     {l.letter}
                   </span>
                 ))}
