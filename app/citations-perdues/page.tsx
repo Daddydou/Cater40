@@ -4,13 +4,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const LETTER_VALUES: Record<string, number> = {
-  A: 10, E: 10, I: 10, O: 10, U: 10,
-  N: 10, R: 10, S: 10, T: 10, L: 10,
-  D: 5,  G: 5,  M: 5,
-  B: 4,  C: 4,  P: 4,
-  F: 3,  H: 3,  V: 3,
-  J: 2,  Q: 2,
-  K: 1,  W: 1,  X: 1,  Y: 1,  Z: 1,
+  A: 4, E: 4, I: 4, O: 4, U: 4, Y: 4,
+  R: 3, S: 3, T: 3, L: 3, N: 3,
+  B: 1, C: 1, D: 1, F: 1, G: 1, H: 1,
+  J: 1, K: 1, M: 1, P: 1, Q: 1, V: 1,
+  W: 1, X: 1, Z: 1,
 };
 
 const COLORED_LETTERS: Record<string, string> = {
@@ -309,7 +307,7 @@ export default function CitationsPerduesPage() {
                   isBravo    ? 'bg-green-50 border-green-400 scale-[1.01]' :
                   validee    ? 'bg-green-50 border-green-200' :
                   isSelected ? 'bg-yellow-50 border-yellow-400' :
-                               'bg-gray-50 border-gray-200'
+                               'bg-gray-50 border-gray-400'
                 }`}
               >
                 <div
@@ -401,7 +399,7 @@ export default function CitationsPerduesPage() {
                   }`}
                 >
                   <span className="font-black leading-none" style={{ color: bought ? '#d1d5db' : '#111827' }}>{letter}</span>
-                  <span className={`text-[8px] mt-0.5 ${bought ? 'text-gray-300' : 'text-yellow-600'}`}>{cost}</span>
+                  <span className={`text-xs mt-0.5 ${bought ? 'text-gray-300' : 'text-yellow-600'}`}>{cost}</span>
                 </button>
               );
             })}
