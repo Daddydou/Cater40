@@ -407,22 +407,44 @@ export default function CitationsPerduesPage() {
         </div>
 
         {/* Lettres spéciales découvertes */}
-        {(session.lettres_colorees_revelees?.length || 0) > 0 && (
-          <div className="bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 space-y-2">
-            <p className="text-xs text-gray-500 uppercase tracking-widest" style={{ fontFamily: 'sans-serif' }}>Lettres spéciales découvertes</p>
-            <div className="flex gap-3 flex-wrap">
-              {session.lettres_colorees_revelees.map(letter => (
-                <span
-                  key={letter}
-                  className="text-3xl font-black"
-                  style={{ color: COLORED_LETTERS[letter], textShadow: `0 0 10px ${COLORED_LETTERS[letter]}99` }}
-                >
-                  {letter}
-                </span>
-              ))}
+        {(() => {
+          const BOUTON_LETTERS_INFO: Record<number, { letter: string, color: string }> = {
+            1: { letter: 'C', color: '#9ca3af' },
+            2: { letter: 'A', color: '#92400e' },
+            3: { letter: 'R', color: '#1e40af' },
+            4: { letter: 'O', color: '#000000' },
+          }
+          const boutonsLetters = Object.entries(boutonsActifs)
+            .filter(([, actif]) => actif)
+            .map(([n]) => BOUTON_LETTERS_INFO[Number(n)])
+
+          const allLetters = [
+            ...(session.lettres_colorees_revelees || []).map(l => ({ letter: l, color: COLORED_LETTERS[l] })),
+            ...boutonsLetters,
+          ]
+
+          return allLetters.length > 0 ? (
+            <div className="bg-gray-50 border border-gray-400 rounded-2xl px-5 py-4 space-y-2">
+              <p className="text-xs text-gray-500 uppercase tracking-widest" style={{ fontFamily: 'sans-serif' }}>
+                Lettres spéciales découvertes
+              </p>
+              <div className="flex gap-3 flex-wrap">
+                {allLetters.map((l, i) => (
+                  <span
+                    key={i}
+                    className="text-3xl font-black"
+                    style={{
+                      color: l.color,
+                      textShadow: `0 0 8px ${l.color}66`,
+                    }}
+                  >
+                    {l.letter}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          ) : null
+        })()}
 
       </div>
     </div>
