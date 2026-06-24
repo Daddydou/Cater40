@@ -45,6 +45,7 @@ export default function QuizzFriends() {
   const [gameState, setGameState]           = useState<GameState | null>(null)
   const [answered, setAnswered]             = useState(false)
   const [myAnswer, setMyAnswer]             = useState<MyAnswer | null>(null)
+  const [selectedIndex, setSelectedIndex]   = useState<number | null>(null)
   const [freeText, setFreeText]             = useState('')
   const [avatarFile, setAvatarFile]         = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview]   = useState<string | null>(null)
@@ -113,11 +114,13 @@ export default function QuizzFriends() {
           } else {
             setAnsweredSync(false)
             setMyAnswer(null)
+            setSelectedIndex(null)
             setFreeText('')
           }
         } else {
           setAnsweredSync(false)
           setMyAnswer(null)
+          setSelectedIndex(null)
           setFreeText('')
         }
       } else if (answeredRef.current && pid && data.current_question_id) {
@@ -168,14 +171,14 @@ export default function QuizzFriends() {
     if (gs) setGameState(gs)
   }
 
-  const handleAnswer = async (chosenShuffledIndex: number) => {
-    if (answered || !playerId || !gameState?.current_question_id || !gameState.question_open) return
+  const handleValidateQCM = async () => {
+    if (answered || selectedIndex === null || !playerId || !gameState?.current_question_id || !gameState.question_open) return
     const question = FRIENDS_QUESTIONS.find(q => q.id === gameState.current_question_id)
     if (!question || question.type !== 'qcm') return
     const shuffled = seededShuffle(question.options, question.id)
     const correctText = question.options[question.correctIndex]
-    const is_correct = shuffled[chosenShuffledIndex] === correctText
-    const ans: MyAnswer = { chosen_index: chosenShuffledIndex, is_correct, free_text: null, validated: false }
+    const is_correct = shuffled[selectedIndex] === correctText
+    const ans: MyAnswer = { chosen_index: selectedIndex, is_correct, free_text: null, validated: false }
     setAnsweredSync(true)
     setMyAnswer(ans)
     await supabase.from('friends_answers').upsert(
@@ -184,7 +187,7 @@ export default function QuizzFriends() {
         player_id: playerId,
         player_name: prenom,
         question_id: question.id,
-        chosen_index: chosenShuffledIndex,
+        chosen_index: selectedIndex,
         is_correct,
         free_text: null,
         validated: false,
@@ -390,13 +393,31 @@ export default function QuizzFriends() {
           </>
         )
       }
+      // QCM verrouillé : afficher les options avec la sélection mise en évidence
+      const myChosenIndex = myAnswer?.chosen_index ?? -1
       return wrap(
         <>
           {questionCard}
-          <div className="text-center py-12 space-y-4">
-            <div className="text-5xl">✅</div>
-            <p className="text-xl font-bold text-yellow-400">Réponse envoyée !</p>
-            <p className="text-white/40 text-sm">En attente des autres joueurs…</p>
+          <div className="space-y-2">
+            {shuffledOptions.map((opt, i) => {
+              const isMyChoice = i === myChosenIndex
+              return (
+                <div key={i} className={`w-full border rounded-xl px-4 py-3 text-sm ${
+                  isMyChoice
+                    ? 'bg-yellow-500/20 border-yellow-500/50 text-white'
+                    : 'bg-white/5 border-white/10 text-white/30'
+                }`}>
+                  <span className={`font-bold mr-2 ${isMyChoice ? 'text-yellow-400' : 'text-white/20'}`}>
+                    {OPTION_LABELS[i]}.
+                  </span>
+                  {opt}
+                  {isMyChoice && <span className="ml-2 text-yellow-400/70 text-xs">← ta réponse</span>}
+                </div>
+              )
+            })}
+          </div>
+          <div className="text-center py-3 rounded-xl bg-yellow-500/10 text-yellow-300 text-sm font-semibold">
+            ✅ Réponse envoyée ! En attente des autres joueurs…
           </div>
         </>
       )
@@ -413,17 +434,33 @@ export default function QuizzFriends() {
           </div>
           {questionCard}
           <div className="space-y-3">
-            {shuffledOptions.map((opt, i) => (
-              <button
-                key={i}
-                onClick={() => handleAnswer(i)}
-                className={`w-full text-left bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-sm transition-all active:scale-98 ${OPTION_COLORS[i]}`}
-              >
-                <span className="text-white/40 font-bold mr-2">{OPTION_LABELS[i]}.</span>
-                {opt}
-              </button>
-            ))}
+            {shuffledOptions.map((opt, i) => {
+              const isSelected = i === selectedIndex
+              return (
+                <button
+                  key={i}
+                  onClick={() => setSelectedIndex(i)}
+                  className={`w-full text-left border rounded-xl px-4 py-4 text-sm transition-all active:scale-98 ${
+                    isSelected
+                      ? 'bg-yellow-500/20 border-yellow-500/60 text-white'
+                      : `bg-white/5 border-white/10 ${OPTION_COLORS[i]}`
+                  }`}
+                >
+                  <span className={`font-bold mr-2 ${isSelected ? 'text-yellow-400' : 'text-white/40'}`}>
+                    {OPTION_LABELS[i]}.
+                  </span>
+                  {opt}
+                </button>
+              )
+            })}
           </div>
+          <button
+            onClick={handleValidateQCM}
+            disabled={selectedIndex === null}
+            className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl py-3 text-sm disabled:opacity-30 transition-all active:scale-95"
+          >
+            Valider ma réponse →
+          </button>
         </div>
       )
     }
