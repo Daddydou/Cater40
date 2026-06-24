@@ -21,8 +21,9 @@ function ClassementContent() {
   const [showMessage, setShowMessage]     = useState(false)
   const [loading, setLoading]             = useState(true)
   const [roomId, setRoomId]               = useState<string | null>(null)
-  const roomIdRef    = useRef<string | null>(null)
-  const sessionIdRef = useRef<string | null>(null)
+  const roomIdRef         = useRef<string | null>(null)
+  const sessionIdRef      = useRef<string | null>(null)
+  const confettiTriggered = useRef(false)
 
   useEffect(() => {
     const load = async () => {
@@ -86,6 +87,15 @@ function ClassementContent() {
     }, 2000)
     return () => clearInterval(interval)
   }, [isAnimateur, roomId])
+
+  // Confettis pour les spectateurs dès que tout est révélé
+  useEffect(() => {
+    if (confettiTriggered.current || players.length === 0) return
+    if (revealedCount >= players.length) {
+      confettiTriggered.current = true
+      setTimeout(() => { setShowConfetti(true); setShowMessage(true) }, 600)
+    }
+  }, [revealedCount, players.length])
 
   const handleNext = async () => {
     const next = revealedCount + 1

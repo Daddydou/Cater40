@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import PauseOverlay from '@/components/PauseOverlay'
 
@@ -17,9 +18,9 @@ const STATUS_TO_STEP: Record<string, Step> = {
 }
 
 export default function Dictee() {
+  const router = useRouter()
   const [step, setStep]   = useState<Step>('prenom')
   const [prenom, setPrenom] = useState('')
-  const [myScore, setMyScore] = useState<number | null>(null)
   const playerIdRef  = useRef<string | null>(null)
   const roomIdRef    = useRef<string | null>(null)
   const sessionIdRef = useRef<string | null>(null)
@@ -63,22 +64,12 @@ export default function Dictee() {
     return () => clearInterval(interval)
   }, [])
 
-  // Poll score toutes les 2s au step 'fin' (+ fetch immédiat)
+  // Redirection vers le classement dès que le step passe à 'fin'
   useEffect(() => {
-    if (step !== 'fin') return
-    const fetchScore = async () => {
-      if (!playerIdRef.current) return
-      const { data } = await supabase
-        .from('players')
-        .select('score')
-        .eq('id', playerIdRef.current)
-        .maybeSingle()
-      if (data !== null) setMyScore(data.score)
+    if (step === 'fin') {
+      router.push('/dictee/classement')
     }
-    fetchScore()
-    const interval = setInterval(fetchScore, 2000)
-    return () => clearInterval(interval)
-  }, [step])
+  }, [step, router])
 
   const handleJoin = async () => {
     if (!prenom.trim()) return
@@ -192,20 +183,9 @@ export default function Dictee() {
   // ── Fin ────────────────────────────────────────────────────────
   if (step === 'fin') {
     return (
-      <main className="min-h-screen bg-[#1a1a0f] flex flex-col items-center justify-center p-6 text-white text-center space-y-4">
-        <div className="text-6xl">{myScore !== null ? '🎉' : '⏳'}</div>
-        <h2 className="text-2xl font-bold">{prenom}</h2>
-        {myScore !== null ? (
-          <>
-            <p className="text-white/40 text-sm">Ton score</p>
-            <p className="text-7xl font-black text-amber-400 leading-none">
-              {myScore}
-              <span className="text-white/30 text-3xl">/20</span>
-            </p>
-          </>
-        ) : (
-          <p className="text-white/50">En attente du classement…</p>
-        )}
+      <main className="min-h-screen bg-[#1a1a0f] flex flex-col items-center justify-center p-6 text-white text-center">
+        <div className="text-5xl mb-4 animate-spin">⏳</div>
+        <p className="text-white/50">Redirection vers le classement…</p>
       </main>
     )
   }
