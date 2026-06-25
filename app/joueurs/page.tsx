@@ -183,11 +183,6 @@ export default function PortailJoueurs() {
           </div>
         )}
 
-        <div className="mt-8 text-center">
-          <a href="/" className="text-white/30 hover:text-white/60 text-sm transition-colors">
-            ← Retour à l&apos;accueil
-          </a>
-        </div>
 
         {/* ── Pourboire ────────────────────────────────────── */}
         <div className="mt-8 bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
