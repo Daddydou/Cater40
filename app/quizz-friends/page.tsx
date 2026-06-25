@@ -74,7 +74,7 @@ export default function QuizzFriends() {
         setRoomId(data.id)
         roomIdRef.current = data.id
         try {
-          const saved = sessionStorage.getItem(LS_KEY)
+          const saved = localStorage.getItem(LS_KEY)
           if (saved) {
             const { playerId: savedId, prenom: savedPrenom } = JSON.parse(saved)
             const { data: existing } = await supabase
@@ -87,7 +87,7 @@ export default function QuizzFriends() {
                 .from('friends_game').select('status').eq('room_id', data.id).maybeSingle()
               setStep(gs?.status === 'playing' ? 'jeu' : 'attente')
             } else {
-              sessionStorage.removeItem(LS_KEY)
+              localStorage.removeItem(LS_KEY)
             }
           }
         } catch {}
@@ -173,7 +173,7 @@ export default function QuizzFriends() {
   const handleJoin = async () => {
     if (!prenom.trim() || !roomId) return
     try {
-      const saved = sessionStorage.getItem(LS_KEY)
+      const saved = localStorage.getItem(LS_KEY)
       if (saved) {
         const { playerId: savedId } = JSON.parse(saved)
         const { data: existing } = await supabase
@@ -186,7 +186,7 @@ export default function QuizzFriends() {
           setStep(gs?.status === 'playing' ? 'jeu' : 'attente')
           return
         } else {
-          sessionStorage.removeItem(LS_KEY)
+          localStorage.removeItem(LS_KEY)
         }
       }
     } catch {}
@@ -198,7 +198,7 @@ export default function QuizzFriends() {
     setPlayerId(data.id)
     playerIdRef.current = data.id
     try {
-      sessionStorage.setItem(LS_KEY, JSON.stringify({ playerId: data.id, prenom: prenom.trim() }))
+      localStorage.setItem(LS_KEY, JSON.stringify({ playerId: data.id, prenom: prenom.trim() }))
     } catch {}
     if (avatarFile) {
       const url = await uploadAvatar(avatarFile, roomId, data.id)
