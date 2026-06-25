@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import PauseOverlay from '@/components/PauseOverlay'
 
 const ROOM_CODE = 'dictee'
+const LS_KEY = 'cater40_player_dictee'
 
 type Step = 'prenom' | 'attente' | 'ecriture' | 'correction' | 'notes' | 'fin'
 
@@ -34,6 +35,43 @@ export default function Dictee() {
       setStep(next)
     }
   }
+
+  // Reconnexion automatique au montage
+  useEffect(() => {
+    const reconnect = async () => {
+      try {
+        const saved = localStorage.getItem(LS_KEY)
+        if (!saved) return
+        const { playerId: savedId, prenom: savedPrenom } = JSON.parse(saved)
+
+        const { data: room } = await supabase
+          .from('rooms').select('id').eq('code', ROOM_CODE).maybeSingle()
+        if (!room) return
+
+        const { data: existing } = await supabase
+          .from('players').select('id').eq('id', savedId).eq('room_id', room.id).maybeSingle()
+        if (!existing) { localStorage.removeItem(LS_KEY); return }
+
+        roomIdRef.current = room.id
+        playerIdRef.current = existing.id
+        setPrenom(savedPrenom)
+
+        const { data: session } = await supabase
+          .from('dictee_sessions').select('id, status')
+          .eq('room_id', room.id)
+          .order('created_at', { ascending: false })
+          .limit(1).maybeSingle()
+        if (session) {
+          sessionIdRef.current = session.id
+          applyStatus(session.status)
+        } else {
+          stepRef.current = 'attente'
+          setStep('attente')
+        }
+      } catch {}
+    }
+    reconnect()
+  }, [])
 
   // Polling démarré après inscription
   useEffect(() => {
@@ -73,6 +111,37 @@ export default function Dictee() {
 
   const handleJoin = async () => {
     if (!prenom.trim()) return
+    try {
+      const saved = localStorage.getItem(LS_KEY)
+      if (saved) {
+        const { playerId: savedId } = JSON.parse(saved)
+        const { data: roomCheck } = await supabase
+          .from('rooms').select('id').eq('code', ROOM_CODE).maybeSingle()
+        if (roomCheck) {
+          const { data: existing } = await supabase
+            .from('players').select('id').eq('id', savedId).eq('room_id', roomCheck.id).maybeSingle()
+          if (existing) {
+            roomIdRef.current = roomCheck.id
+            playerIdRef.current = existing.id
+            const { data: session } = await supabase
+              .from('dictee_sessions').select('id, status')
+              .eq('room_id', roomCheck.id)
+              .order('created_at', { ascending: false })
+              .limit(1).maybeSingle()
+            if (session) {
+              sessionIdRef.current = session.id
+              applyStatus(session.status)
+            } else {
+              stepRef.current = 'attente'
+              setStep('attente')
+            }
+            return
+          } else {
+            localStorage.removeItem(LS_KEY)
+          }
+        }
+      }
+    } catch {}
 
     const { data: room } = await supabase
       .from('rooms')
@@ -89,6 +158,9 @@ export default function Dictee() {
       .maybeSingle()
     if (!player) return
     playerIdRef.current = player.id
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({ playerId: player.id, prenom: prenom.trim() }))
+    } catch {}
 
     const { data: session } = await supabase
       .from('dictee_sessions')
