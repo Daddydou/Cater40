@@ -9,6 +9,7 @@ import { uploadAvatar } from '@/lib/hooks/useAvatarUpload'
 import PauseOverlay from '@/components/PauseOverlay'
 
 const ROOM_CODE = 'concours-ortho'
+const LS_KEY = 'cater40_player_concours-ortho'
 
 type Question = {
   id: string
@@ -70,7 +71,24 @@ export default function ConcursOrtho() {
     const load = async () => {
       const { data } = await supabase
         .from('rooms').select('id, status').eq('code', ROOM_CODE).single()
-      if (data) { setRoomId(data.id); setRoomStatus(data.status) }
+      if (data) {
+        setRoomId(data.id); setRoomStatus(data.status)
+        try {
+          const saved = localStorage.getItem(LS_KEY)
+          if (saved) {
+            const { playerId: savedId, prenom: savedPrenom } = JSON.parse(saved)
+            const { data: existing } = await supabase
+              .from('players').select('id').eq('id', savedId).eq('room_id', data.id).maybeSingle()
+            if (existing) {
+              setPlayerId(existing.id)
+              setPrenom(savedPrenom)
+              setStep(data.status === 'playing' ? 'jeu' : data.status === 'finished' ? 'fin' : 'attente')
+            } else {
+              localStorage.removeItem(LS_KEY)
+            }
+          }
+        } catch {}
+      }
     }
     load()
   }, [])
@@ -178,11 +196,29 @@ export default function ConcursOrtho() {
   // Inscription
   const handleJoin = async () => {
     if (!prenom.trim() || !roomId) return
+    try {
+      const saved = localStorage.getItem(LS_KEY)
+      if (saved) {
+        const { playerId: savedId } = JSON.parse(saved)
+        const { data: existing } = await supabase
+          .from('players').select('id').eq('id', savedId).eq('room_id', roomId).maybeSingle()
+        if (existing) {
+          setPlayerId(existing.id)
+          setStep(roomStatus === 'playing' ? 'jeu' : 'attente')
+          return
+        } else {
+          localStorage.removeItem(LS_KEY)
+        }
+      }
+    } catch {}
     const { data } = await supabase
       .from('players').insert({ room_id: roomId, name: prenom.trim(), score: 0 })
       .select().single()
     if (data) {
       setPlayerId(data.id)
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify({ playerId: data.id, prenom: prenom.trim() }))
+      } catch {}
       if (avatarFile) {
         const url = await uploadAvatar(avatarFile, roomId!, data.id)
         if (url) await supabase.from('players').update({ avatar_url: url }).eq('id', data.id)
