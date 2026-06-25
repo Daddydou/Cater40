@@ -8,6 +8,7 @@ import { uploadAvatar } from '@/lib/hooks/useAvatarUpload'
 import PauseOverlay from '@/components/PauseOverlay'
 
 const ROOM_CODE = 'famille-or'
+const LS_KEY = 'cater40_player_famille-or'
 
 type Session = {
   id: string
@@ -88,6 +89,24 @@ export default function FamilleOrJoueurs() {
       if (!room) { setLoading(false); return }
       setRoomId(room.id)
 
+      if (!joined) {
+        try {
+          const saved = localStorage.getItem(LS_KEY)
+          if (saved) {
+            const { playerId: savedId } = JSON.parse(saved)
+            const { data: existing } = await supabase
+              .from('players').select('id, name, equipe, avatar_url')
+              .eq('id', savedId).eq('room_id', room.id).maybeSingle()
+            if (existing) {
+              setMyPlayer({ id: existing.id, name: existing.name, equipe: existing.equipe, avatar_url: existing.avatar_url })
+              setJoined(true)
+            } else {
+              localStorage.removeItem(LS_KEY)
+            }
+          }
+        } catch {}
+      }
+
       const { data: sess } = await supabase
         .from('famille_or_sessions').select('*')
         .eq('room_id', room.id)
@@ -133,6 +152,22 @@ export default function FamilleOrJoueurs() {
 
   const handleJoin = async () => {
     if (!prenom.trim() || !roomId) return
+    try {
+      const saved = localStorage.getItem(LS_KEY)
+      if (saved) {
+        const { playerId: savedId } = JSON.parse(saved)
+        const { data: existing } = await supabase
+          .from('players').select('id, name, equipe, avatar_url')
+          .eq('id', savedId).eq('room_id', roomId).maybeSingle()
+        if (existing) {
+          setMyPlayer({ id: existing.id, name: existing.name, equipe: existing.equipe, avatar_url: existing.avatar_url })
+          setJoined(true)
+          return
+        } else {
+          localStorage.removeItem(LS_KEY)
+        }
+      }
+    } catch {}
     const { data } = await supabase
       .from('players').insert({ room_id: roomId, name: prenom.trim(), score: 0 })
       .select().single()
@@ -142,6 +177,9 @@ export default function FamilleOrJoueurs() {
         if (url) await supabase.from('players').update({ avatar_url: url }).eq('id', data.id)
       }
       setMyPlayer({ id: data.id, name: prenom.trim(), equipe: null })
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify({ playerId: data.id, prenom: prenom.trim() }))
+      } catch {}
       setJoined(true)
     }
   }
