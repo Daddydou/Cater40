@@ -123,7 +123,6 @@ export default function Home() {
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-10 pt-6">
           <div className="text-5xl mb-3">🎂</div>
-          <h1 className="text-3xl font-bold mb-1">Cater40</h1>
           <p className="text-white/50 text-sm">Cater Olympiques 2026</p>
         </div>
 
