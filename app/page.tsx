@@ -124,7 +124,7 @@ export default function Home() {
         <div className="text-center mb-10 pt-6">
           <div className="text-5xl mb-3">🎂</div>
           <h1 className="text-3xl font-bold mb-1">Cater40</h1>
-          <p className="text-white/50 text-sm">Les jeux des 40 ans de Cater</p>
+          <p className="text-white/50 text-sm">Cater Olympiques 2026</p>
         </div>
 
         {jeux.length === 0 ? (

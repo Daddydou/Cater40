@@ -153,8 +153,7 @@ export default function PortailJoueurs() {
       <div className="max-w-lg mx-auto">
         <div className="text-center mb-10 pt-6">
           <div className="text-5xl mb-3">🎂</div>
-          <h1 className="text-2xl font-bold mb-1">Bienvenue ! Choisis ton jeu</h1>
-          <p className="text-white/50 text-sm">Les jeux de l&apos;anniversaire de Cater 🎂</p>
+          <p className="text-white/50 text-sm">Cater Olympiques 2026</p>
         </div>
 
         {jeux.length === 0 ? (
