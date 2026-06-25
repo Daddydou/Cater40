@@ -7,8 +7,9 @@ import Link from 'next/link'
 
 const ROOM_CODE = 'dictee'
 
-const TEXTE_DICTEE =
-  "À vélo\n\nQu'un cyclone se lève ou qu'une canicule s'abatte, l'adepte du V.T.T. a une pêche d'enfer. Rien ne saurait l'arrêter. Le faciès comprimé sous un casque antichoc, il enfouche son vélo, et hop ! Le voilà dans les sous-bois. Il évite en zigzaguant des nids-de-poule, roule en cahotant sur des sentiers bosselés et s'éclate dans les clairières. Infatigable, il dévale des pentes verglacées, puis, son parcours du combattant achevé, il met pied à terre, flapi, crotté, courbatu, mais content."
+const TEXTE_DICTEE = `À vélo
+
+Qu'un cyclone se lève ou qu'une canicule s'abatte, l'adepte du V.T.T. a une pêche d'enfer. Rien ne saurait l'arrêter. Le faciès comprimé sous un casque antichoc, il enfouche son vélo, et hop ! Le voilà dans les sous-bois. Il évite en zigzaguant des nids-de-poule, roule en cahotant sur des sentiers bosselés et s'éclate dans les clairières. Infatigable, il dévale des pentes verglacées, puis, son parcours du combattant achevé, il met pied à terre, flapi, crotté, courbatu, mais content.`
 
 type SessionStatus = 'waiting' | 'writing' | 'correcting' | 'scoring' | 'finished'
 type Phase = 'loading' | 'ready' | 'writing' | 'correcting' | 'scoring' | 'finished'
@@ -179,7 +180,7 @@ export default function DicteeAnimateur() {
 
           <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
             <p className="text-white/40 text-xs uppercase tracking-wide mb-2">Texte à dicter</p>
-            <p className="text-white/60 text-sm leading-relaxed italic">«{TEXTE_DICTEE}»</p>
+            <pre className="text-white/60 text-sm leading-relaxed whitespace-pre-wrap font-sans italic">«{TEXTE_DICTEE}»</pre>
           </div>
 
           <button
