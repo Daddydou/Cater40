@@ -10,6 +10,7 @@ import { FRIENDS_QUESTIONS, seededShuffle } from '@/lib/friends-quiz-data'
 import PauseOverlay from '@/components/PauseOverlay'
 
 const ROOM_CODE = 'quizz-friends'
+const LS_KEY = 'cater40_player_quizz-friends'
 
 type GameState = {
   id: string
@@ -72,6 +73,24 @@ export default function QuizzFriends() {
       if (data) {
         setRoomId(data.id)
         roomIdRef.current = data.id
+        try {
+          const saved = sessionStorage.getItem(LS_KEY)
+          if (saved) {
+            const { playerId: savedId, prenom: savedPrenom } = JSON.parse(saved)
+            const { data: existing } = await supabase
+              .from('players').select('id').eq('id', savedId).eq('room_id', data.id).maybeSingle()
+            if (existing) {
+              setPlayerId(savedId)
+              playerIdRef.current = savedId
+              setPrenom(savedPrenom)
+              const { data: gs } = await supabase
+                .from('friends_game').select('status').eq('room_id', data.id).maybeSingle()
+              setStep(gs?.status === 'playing' ? 'jeu' : 'attente')
+            } else {
+              sessionStorage.removeItem(LS_KEY)
+            }
+          }
+        } catch {}
       }
     }
     load()
@@ -160,6 +179,9 @@ export default function QuizzFriends() {
     if (!data) return
     setPlayerId(data.id)
     playerIdRef.current = data.id
+    try {
+      sessionStorage.setItem(LS_KEY, JSON.stringify({ playerId: data.id, prenom: prenom.trim() }))
+    } catch {}
     if (avatarFile) {
       const url = await uploadAvatar(avatarFile, roomId, data.id)
       if (url) await supabase.from('players').update({ avatar_url: url }).eq('id', data.id)
