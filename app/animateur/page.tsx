@@ -289,6 +289,13 @@ export default function HubAnimateur() {
           🔄 Tout réinitialiser avant la soirée
         </button>
 
+        <a
+          href="/tableau-scores"
+          className="block w-full bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 text-center font-bold rounded-xl py-4 transition-all active:scale-95 mb-6"
+        >
+          📊 Tableau des scores
+        </a>
+
         <div className="space-y-3">
           {JEUX.map(jeu => (
             <div key={jeu.num} className="bg-white/5 border border-white/10 rounded-2xl p-4">
