@@ -172,6 +172,24 @@ export default function QuizzFriends() {
 
   const handleJoin = async () => {
     if (!prenom.trim() || !roomId) return
+    try {
+      const saved = sessionStorage.getItem(LS_KEY)
+      if (saved) {
+        const { playerId: savedId } = JSON.parse(saved)
+        const { data: existing } = await supabase
+          .from('players').select('id').eq('id', savedId).eq('room_id', roomId).maybeSingle()
+        if (existing) {
+          setPlayerId(existing.id)
+          playerIdRef.current = existing.id
+          const { data: gs } = await supabase
+            .from('friends_game').select('status').eq('room_id', roomId).maybeSingle()
+          setStep(gs?.status === 'playing' ? 'jeu' : 'attente')
+          return
+        } else {
+          sessionStorage.removeItem(LS_KEY)
+        }
+      }
+    } catch {}
     const { data } = await supabase
       .from('players')
       .insert({ room_id: roomId, name: prenom.trim(), score: 0 })
