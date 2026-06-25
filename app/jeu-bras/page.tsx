@@ -9,6 +9,7 @@ const nunito = Nunito({ subsets: ['latin'] })
 
 const BUCKET_URL =
   'https://ubnkuwyqclrjckogldlc.supabase.co/storage/v1/object/public/jeu-bras'
+const LS_KEY = 'cater40_player_jeu-bras'
 
 type UIState =
   | 'prenom'
@@ -98,6 +99,37 @@ export default function JeuBrasCater() {
     if (data) applyGameState(data.current_game)
   }, [applyGameState])
 
+  // Reconnexion automatique au montage
+  useEffect(() => {
+    const reconnect = async () => {
+      try {
+        const saved = localStorage.getItem(LS_KEY)
+        if (!saved) return
+        const { prenom: savedPrenom } = JSON.parse(saved)
+
+        const activeRoom = await getActiveRoom()
+        if (!activeRoom) return
+
+        roomRef.current = activeRoom
+        setPrenom(savedPrenom)
+
+        const { data: files } = await supabase.storage.from('jeu-bras').list()
+        const filtered = (files ?? [])
+          .filter(f => /\.(jpg|jpeg|png)$/i.test(f.name))
+          .map(f => f.name)
+        const shuffled = shuffleWithSeed(filtered, seedFromRoomId(activeRoom.id))
+        setPhotos(shuffled)
+
+        const { data: roomData } = await supabase
+          .from('rooms').select('current_game').eq('id', activeRoom.id).maybeSingle()
+
+        setRoom(activeRoom)
+        if (roomData) applyGameState(roomData.current_game)
+      } catch {}
+    }
+    reconnect()
+  }, [])
+
   // Realtime — démarre seulement quand room est défini (après handleJoin)
   useEffect(() => {
     if (!room) return
@@ -135,6 +167,9 @@ export default function JeuBrasCater() {
 
   const handleJoin = async () => {
     if (!prenom.trim()) return
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({ prenom: prenom.trim() }))
+    } catch {}
     setUiState('loading')
 
     const activeRoom = await getActiveRoom()
